@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AeroNet Lite — AI Drone Delivery Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0b0b16;--bg2:#111120;--card:#15152a;--card2:#1c1c34;
+  --cyan:#00e5d4;--purple:#8b5cf6;--yellow:#f59e0b;--pink:#ec4899;
+  --green:#10b981;--red:#ef4444;--blue:#3b82f6;
+  --text:#e8e8ff;--muted:#7070a0;--border:#242440;--sw:230px;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden;font-size:13px}
+
+/* ── SIDEBAR ── */
+.sidebar{width:var(--sw);min-width:var(--sw);background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto}
+.sidebar::-webkit-scrollbar{width:4px}.sidebar::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.logo{display:flex;align-items:center;gap:10px;padding:18px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.logo-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--cyan),var(--purple));border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.logo-name{font-size:14px;font-weight:800;letter-spacing:1.5px}
+.logo-sub{font-size:9px;color:var(--cyan);letter-spacing:3px;font-weight:600}
+.nav-group{padding:12px 0 4px}
+.nav-label{font-size:9.5px;color:var(--muted);letter-spacing:1.5px;font-weight:700;padding:0 16px 7px;text-transform:uppercase}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 16px;color:var(--muted);font-size:12.5px;cursor:pointer;border-left:3px solid transparent;transition:all .15s;user-select:none}
+.nav-item:hover{color:var(--text);background:rgba(255,255,255,.04)}
+.nav-item.active{color:var(--text);background:rgba(0,229,212,.08);border-left-color:var(--cyan)}
+.nav-badge{margin-left:auto;font-size:10px;font-weight:700;padding:2px 6px;border-radius:9px;background:var(--pink);color:#fff}
+.nav-badge.g{background:var(--green)}
+
+/* ── ALGO CONFIG (sidebar footer) ── */
+.algo-config{border-top:1px solid var(--border);padding:14px;flex-shrink:0}
+.algo-config-title{font-size:11px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.algo-group{margin-bottom:11px}
+.algo-group-label{font-size:10px;color:var(--muted);font-weight:600;letter-spacing:.5px;margin-bottom:5px}
+.algo-always{font-size:10.5px;padding:4px 10px;background:rgba(16,185,129,.1);color:var(--green);border:1px solid rgba(16,185,129,.25);border-radius:6px;display:inline-flex;align-items:center;gap:5px}
+.algo-btns{display:flex;gap:4px;flex-wrap:wrap}
+.algo-btn{font-size:10px;font-weight:600;padding:4px 9px;border:1px solid var(--border);border-radius:6px;cursor:pointer;background:var(--card2);color:var(--muted);transition:all .15s}
+.algo-btn.active{background:rgba(139,92,246,.15);color:var(--purple);border-color:var(--purple)}
+.algo-btn:hover:not(.active){color:var(--text);border-color:rgba(255,255,255,.2)}
+.algo-chips{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:8px 0}
+.algo-chip{font-size:9.5px;font-weight:600;padding:3px 6px;border-radius:5px;text-align:center;border:1px solid}
+.chip-cyan{background:rgba(0,229,212,.1);color:var(--cyan);border-color:rgba(0,229,212,.25)}
+.chip-green{background:rgba(16,185,129,.1);color:var(--green);border-color:rgba(16,185,129,.25)}
+.chip-warn{background:rgba(245,158,11,.1);color:var(--yellow);border-color:rgba(245,158,11,.25)}
+.chip-alert{background:rgba(239,68,68,.1);color:var(--red);border-color:rgba(239,68,68,.25)}
+.run-sm{width:100%;background:linear-gradient(135deg,var(--purple),#4f46e5);border:none;color:#fff;padding:9px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:.4px;box-shadow:0 0 16px rgba(139,92,246,.3);transition:all .2s;margin-top:10px}
+.run-sm:hover{box-shadow:0 0 26px rgba(139,92,246,.5)}
+
+/* ── MAIN ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.header{display:flex;align-items:center;gap:12px;padding:12px 20px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0}
+.search{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 12px;flex:1;max-width:300px}
+.search input{background:none;border:none;color:var(--text);font-size:12.5px;outline:none;width:100%}
+.search input::placeholder{color:var(--muted)}
+.hdr-right{display:flex;align-items:center;gap:9px;margin-left:auto}
+.step-badge{font-size:11.5px;background:var(--card);border:1px solid var(--border);border-radius:7px;padding:5px 11px;color:var(--muted)}
+.step-badge b{color:var(--cyan)}
+.iBtn{width:34px;height:34px;background:var(--card);border:1px solid var(--border);border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;color:var(--muted);position:relative}
+.notif-pip{position:absolute;top:6px;right:6px;width:6px;height:6px;background:var(--yellow);border-radius:50%;border:1.5px solid var(--bg2)}
+.run-btn{background:linear-gradient(135deg,var(--purple),#4f46e5);border:none;color:#fff;padding:7px 16px;border-radius:7px;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 0 16px rgba(139,92,246,.3);transition:all .2s}
+.run-btn:hover{box-shadow:0 0 28px rgba(139,92,246,.55);transform:translateY(-1px)}
+.run-btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+.run-btn.done{background:linear-gradient(135deg,var(--green),#059669);box-shadow:0 0 16px rgba(16,185,129,.3)}
+.rdot{width:7px;height:7px;background:rgba(255,255,255,.7);border-radius:50%}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.rdot.on{animation:blink .9s infinite}
+.avatar{width:34px;height:34px;background:linear-gradient(135deg,var(--cyan),var(--purple));border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;cursor:pointer}
+
+/* ── CONTENT ── */
+.content{flex:1;overflow-y:auto;padding:16px 20px 24px;display:flex;flex-direction:column;gap:14px}
+.content::-webkit-scrollbar{width:5px}.content::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ── PROGRESS BAR ── */
+.pbar-track{height:3px;background:var(--border);border-radius:2px;overflow:hidden;flex-shrink:0}
+.pbar-fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--purple));border-radius:2px;transition:width .3s;width:0%}
+
+/* ── STAT CARDS ── */
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;flex-shrink:0}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;position:relative;overflow:hidden}
+.stat-card::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:12px 12px 0 0}
+.sc1::after{background:var(--cyan)}.sc2::after{background:var(--yellow)}.sc3::after{background:var(--pink)}.sc4::after{background:var(--purple)}
+.s-label{font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.6px;text-transform:uppercase;margin-bottom:9px}
+.s-val{font-size:34px;font-weight:800;line-height:1;letter-spacing:-1px;transition:all .35s}
+.sv1{color:var(--cyan);text-shadow:0 0 20px rgba(0,229,212,.4)}
+.sv2{color:var(--yellow);text-shadow:0 0 20px rgba(245,158,11,.4)}
+.sv3{color:var(--pink);text-shadow:0 0 20px rgba(236,72,153,.4)}
+.sv4{color:var(--purple);text-shadow:0 0 20px rgba(139,92,246,.4)}
+.s-sub{font-size:11px;color:var(--muted);margin-top:6px}
+.s-pill{display:inline-flex;align-items:center;font-size:10.5px;font-weight:600;margin-top:4px;padding:2px 7px;border-radius:20px}
+.pill-up{background:rgba(16,185,129,.12);color:var(--green)}
+.pill-dn{background:rgba(239,68,68,.12);color:var(--red)}
+
+/* ── PANELS ── */
+.panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
+.ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.pt{font-size:13.5px;font-weight:700}
+.pbadge{font-size:10.5px;color:var(--muted);background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:3px 9px}
+.pbadge.running{color:var(--cyan);border-color:rgba(0,229,212,.4);background:rgba(0,229,212,.06)}
+.pbadge.done-g{color:var(--green);border-color:rgba(16,185,129,.4)}
+
+/* ── GRID LAYOUT ── */
+.row-main{display:grid;gap:12px;grid-template-columns:1.75fr 1fr}
+.row-half{display:grid;gap:12px;grid-template-columns:1fr 1fr}
+
+/* ── CITY GRID ── */
+.city-grid{display:grid;grid-template-columns:repeat(10,1fr);gap:2px}
+.cell{aspect-ratio:1;border-radius:4px;display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;border:1px solid rgba(0,0,0,.3);transition:transform .1s,box-shadow .1s;overflow:visible}
+.cell:hover{transform:scale(1.22);z-index:30;border-color:rgba(255,255,255,.7);box-shadow:0 0 10px rgba(255,255,255,.2)}
+.cm{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,.9)}
+.dpip{position:absolute;width:7px;height:7px;border-radius:50%;border:1.5px solid #fff;top:1px;right:1px;z-index:5}
+.nf-cell{border:1.5px solid var(--red)!important;outline:2px solid rgba(239,68,68,.3)}
+.grid-leg{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+.gl-item{display:flex;align-items:center;gap:4px;font-size:10.5px;color:var(--muted)}
+.gl-sw{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+
+/* ── TOOLTIP ── */
+#tt{position:fixed;background:var(--card2);border:1px solid var(--border);border-radius:9px;padding:9px 13px;font-size:11.5px;pointer-events:none;z-index:9999;display:none;min-width:160px;box-shadow:0 6px 28px rgba(0,0,0,.6)}
+.tt-t{font-weight:700;margin-bottom:5px;font-size:12px}
+.tt-r{display:flex;justify-content:space-between;gap:12px;margin-bottom:2px;color:var(--muted)}
+.tt-r span:last-child{color:var(--text);font-weight:600}
+
+/* ── DONUT ── */
+.donut-wrap{position:relative;width:170px;height:170px;margin:0 auto 14px}
+.donut-ctr{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+.donut-num{font-size:28px;font-weight:800}
+.donut-lbl{font-size:9.5px;color:var(--muted);letter-spacing:1px;font-weight:600;text-transform:uppercase}
+.dleg{display:flex;flex-direction:column;gap:8px}
+.dleg-row{display:flex;align-items:center;gap:8px;font-size:12px}
+.dleg-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.dleg-name{flex:1;color:var(--muted)}.dleg-cnt{font-weight:700}.dleg-pct{color:var(--muted);font-size:10.5px;margin-left:3px}
+
+/* ── CHARTS ── */
+.ch{position:relative;height:196px}
+.ch-sm{position:relative;height:150px}
+
+/* ── FLEET TABLE ── */
+.ftable{width:100%;border-collapse:collapse;font-size:12px}
+.ftable th{text-align:left;color:var(--muted);font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:0 8px 9px;border-bottom:1px solid var(--border);white-space:nowrap}
+.ftable td{padding:8px 8px;border-bottom:1px solid rgba(36,36,64,.7);vertical-align:middle}
+.ftable tr:last-child td{border-bottom:none}
+.ftable tr:hover td{background:rgba(255,255,255,.02)}
+.did{font-weight:700;font-family:'Courier New',monospace;font-size:11.5px}
+.tbadge{font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:20px}
+.tb-light{background:rgba(0,229,212,.1);color:var(--cyan);border:1px solid rgba(0,229,212,.25)}
+.tb-heavy{background:rgba(139,92,246,.1);color:var(--purple);border:1px solid rgba(139,92,246,.25)}
+.sbadge{font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px;white-space:nowrap}
+.sb-completed{background:rgba(16,185,129,.12);color:var(--green);border:1px solid rgba(16,185,129,.25)}
+.sb-en-route{background:rgba(0,229,212,.1);color:var(--cyan);border:1px solid rgba(0,229,212,.25)}
+.sb-returning{background:rgba(139,92,246,.1);color:var(--purple);border:1px solid rgba(139,92,246,.25)}
+.sb-anomaly{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+.sb-rerouting{background:rgba(245,158,11,.1);color:var(--yellow);border:1px solid rgba(245,158,11,.3)}
+.sb-idle{background:rgba(112,112,160,.1);color:var(--muted);border:1px solid rgba(112,112,160,.2)}
+.sb-delayed{background:rgba(245,158,11,.12);color:var(--yellow);border:1px solid rgba(245,158,11,.25)}
+.batt{display:flex;align-items:center;gap:6px}
+.batt-tr{flex:1;height:4px;background:var(--card2);border-radius:2px;min-width:36px}
+.batt-fl{height:100%;border-radius:2px;transition:width .5s}
+.batt-p{font-size:10.5px;color:var(--muted);width:28px;text-align:right}
+
+/* ── CSP RULES ── */
+.csp-list{display:flex;flex-direction:column;gap:7px}
+.csp-row{display:flex;align-items:center;gap:10px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:9px 12px}
+.csp-icon{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.csp-text{flex:1}.csp-name{font-size:12px;font-weight:700}.csp-desc{font-size:10.5px;color:var(--muted);margin-top:1px}
+.csp-badge{font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px;white-space:nowrap}
+.cb-pending{background:rgba(112,112,160,.1);color:var(--muted);border:1px solid rgba(112,112,160,.2)}
+.cb-pass{background:rgba(16,185,129,.12);color:var(--green);border:1px solid rgba(16,185,129,.25)}
+.cb-fail{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+
+/* ── ML MODEL TABLE ── */
+.ml-table{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:12px}
+.ml-table th{text-align:left;color:var(--muted);font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:0 8px 8px;border-bottom:1px solid var(--border)}
+.ml-table td{padding:7px 8px;border-bottom:1px solid rgba(36,36,64,.7)}
+.ml-table tr:last-child td{border-bottom:none}
+.ml-table tr:hover td{background:rgba(255,255,255,.02)}
+.ml-best{color:var(--cyan);font-weight:700}
+.ml-acc-bar{display:flex;align-items:center;gap:7px}
+.ml-bar-tr{flex:1;height:5px;background:var(--card2);border-radius:3px;overflow:hidden}
+.ml-bar-fl{height:100%;border-radius:3px}
+.ml-badge{font-size:9.5px;font-weight:700;padding:1.5px 7px;border-radius:20px}
+.mb-best{background:rgba(0,229,212,.1);color:var(--cyan);border:1px solid rgba(0,229,212,.25)}
+.mb-norm{background:rgba(112,112,160,.1);color:var(--muted);border:1px solid rgba(112,112,160,.2)}
+
+/* ── SIM LOG ── */
+.sim-log{background:var(--card2);border-radius:8px;padding:10px;font-family:'Courier New',monospace;font-size:11px;height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:3px}
+.sim-log::-webkit-scrollbar{width:4px}.sim-log::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.log-line{display:flex;gap:8px;align-items:baseline}
+.log-step{color:var(--muted);min-width:42px;font-size:10px}
+.log-algo{font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:4px;flex-shrink:0}
+.la-init{background:rgba(139,92,246,.15);color:var(--purple)}
+.la-csp{background:rgba(16,185,129,.15);color:var(--green)}
+.la-ga{background:rgba(0,229,212,.15);color:var(--cyan)}
+.la-astar{background:rgba(139,92,246,.15);color:var(--purple)}
+.la-ml{background:rgba(245,158,11,.15);color:var(--yellow)}
+.la-move{background:rgba(112,112,160,.15);color:var(--muted)}
+.la-alert{background:rgba(239,68,68,.15);color:var(--red)}
+.la-done{background:rgba(16,185,129,.15);color:var(--green)}
+.log-msg{color:var(--text)}
+
+/* ── GA PARAMS ── */
+.ga-params{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.gp{font-size:10px;padding:3px 8px;background:var(--card2);border:1px solid var(--border);border-radius:5px;color:var(--muted)}
+.gp b{color:var(--text)}
+
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.fadeup{animation:fadeUp .3s ease}
+</style>
+</head>
+<body>
+
+<!-- ═══ SIDEBAR ═══ -->
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-icon">✈</div>
+    <div><div class="logo-name">AERONET</div><div class="logo-sub">LITE AI</div></div>
+  </div>
+
+  <div class="nav-group">
+    <div class="nav-label">Overview</div>
+    <div class="nav-item active">⊞ &nbsp;Dashboard</div>
+    <div class="nav-item">🗺 &nbsp;City Grid Map</div>
+  </div>
+  <div class="nav-group">
+    <div class="nav-label">Operations</div>
+    <div class="nav-item">🚁 &nbsp;Fleet Manager <span class="nav-badge g">7</span></div>
+    <div class="nav-item">📦 &nbsp;Deliveries <span class="nav-badge">8</span></div>
+    <div class="nav-item">↗ &nbsp;Route Planner</div>
+    <div class="nav-item">⚡ &nbsp;Charging Stations</div>
+  </div>
+  <div class="nav-group">
+    <div class="nav-label">AI Insights</div>
+    <div class="nav-item">🧠 &nbsp;AI Models</div>
+    <div class="nav-item">⚠️ &nbsp;Health Alerts <span class="nav-badge">2</span></div>
+    <div class="nav-item">📈 &nbsp;Demand Forecast</div>
+  </div>
+  <div class="nav-group">
+    <div class="nav-label">System</div>
+    <div class="nav-item">📋 &nbsp;Simulation Log</div>
+    <div class="nav-item">⚙ &nbsp;Settings</div>
+  </div>
+
+  <!-- ALGORITHM CONFIG -->
+  <div class="algo-config">
+    <div class="algo-config-title">⚙ Algorithm Config</div>
+
+    <div class="algo-group">
+      <div class="algo-group-label">Module 1 — Layout Check</div>
+      <span class="algo-always">✓ CSP (Constraint Satisfaction)</span>
+    </div>
+
+    <div class="algo-group">
+      <div class="algo-group-label">Module 2 — Fleet Optimizer</div>
+      <div class="algo-btns">
+        <button class="algo-btn active" onclick="setAlgo('fleet','GA',this)">Genetic Algo</button>
+        <button class="algo-btn" onclick="setAlgo('fleet','BF',this)">Brute Force</button>
+      </div>
+    </div>
+
+    <div class="algo-group">
+      <div class="algo-group-label">Module 3 — Route Planner</div>
+      <span class="algo-always">✓ A* (Heuristic Search)</span>
+    </div>
+
+    <div class="algo-group">
+      <div class="algo-group-label">Module 5a — Demand Forecast</div>
+      <div class="algo-btns">
+        <button class="algo-btn active" onclick="setAlgo('demand','RF',this)">Random Forest</button>
+        <button class="algo-btn" onclick="setAlgo('demand','LR',this)">Linear Reg</button>
+      </div>
+    </div>
+
+    <div class="algo-group">
+      <div class="algo-group-label">Module 5b — Anomaly Detect</div>
+      <div class="algo-btns">
+        <button class="algo-btn active" onclick="setAlgo('anomaly','RF',this)">Rnd Forest</button>
+        <button class="algo-btn" onclick="setAlgo('anomaly','DT',this)">Dec. Tree</button>
+        <button class="algo-btn" onclick="setAlgo('anomaly','KNN',this)">KNN k=5</button>
+        <button class="algo-btn" onclick="setAlgo('anomaly','NB',this)">Naive Bayes</button>
+      </div>
+    </div>
+
+    <!-- Live status chips -->
+    <div class="algo-chips">
+      <div class="algo-chip chip-green" id="chip-csp">CSP ✓ Ready</div>
+      <div class="algo-chip chip-cyan" id="chip-ga">GA ✓ Ready</div>
+      <div class="algo-chip chip-green" id="chip-astar">A* ✓ Ready</div>
+      <div class="algo-chip chip-warn" id="chip-ml">ML — Idle</div>
+    </div>
+
+    <button class="run-sm" onclick="runSimulation()">▶ &nbsp;RUN SIMULATION</button>
+  </div>
+</aside>
+
+<!-- ═══ MAIN ═══ -->
+<main class="main">
+  <header class="header">
+    <div class="search">
+      <span style="color:var(--muted)">🔍</span>
+      <input type="text" placeholder="Search drones, zones, deliveries…">
+    </div>
+    <div class="hdr-right">
+      <div class="step-badge">Step <b id="stepDisp">0</b> / 20</div>
+      <div class="iBtn">🌙</div>
+      <div class="iBtn">🔔<div class="notif-pip"></div></div>
+      <button class="run-btn" id="mainRunBtn" onclick="runSimulation()">
+        <span class="rdot" id="rdot"></span>
+        <span id="runLabel">▶ RUN SIMULATION</span>
+      </button>
+      <div class="avatar">AD</div>
+    </div>
+  </header>
+
+  <div class="content">
+    <div class="pbar-track"><div class="pbar-fill" id="pbar"></div></div>
+
+    <!-- STAT CARDS -->
+    <div class="stat-row">
+      <div class="stat-card sc1">
+        <div class="s-label">✈ Active Drones</div>
+        <div class="s-val sv1" id="sv-drones">0</div>
+        <div class="s-sub">Deployed from 3 hubs</div>
+        <div class="s-pill pill-up" id="sp-drones">Awaiting simulation</div>
+      </div>
+      <div class="stat-card sc2">
+        <div class="s-label">📦 Packages Done</div>
+        <div class="s-val sv2" id="sv-del">0</div>
+        <div class="s-sub" id="ss-del">of 8 total deliveries</div>
+        <div class="s-pill pill-up" id="sp-del">Awaiting simulation</div>
+      </div>
+      <div class="stat-card sc3">
+        <div class="s-label">⚠ Health Alerts</div>
+        <div class="s-val sv3" id="sv-alert">0</div>
+        <div class="s-sub">Auto-detected by AI</div>
+        <div class="s-pill pill-up" id="sp-alert">All clear</div>
+      </div>
+      <div class="stat-card sc4">
+        <div class="s-label">🔄 Steps Run</div>
+        <div class="s-val sv4" id="sv-steps">0</div>
+        <div class="s-sub">of 20 simulation steps</div>
+        <div class="s-pill pill-up" id="sp-steps">Ready to start</div>
+      </div>
+    </div>
+
+    <!-- ROW 1: CITY GRID + DONUT -->
+    <div class="row-main">
+      <div class="panel">
+        <div class="ph">
+          <div class="pt">🗺 City Grid — 10×10 Smart Layout</div>
+          <div class="pbadge">Hover any cell for details</div>
+        </div>
+        <div class="city-grid" id="cityGrid"></div>
+        <div class="grid-leg" id="gridLeg"></div>
+      </div>
+
+      <div class="panel" style="display:flex;flex-direction:column">
+        <div class="ph">
+          <div class="pt">📊 Delivery Status</div>
+          <div class="pbadge" id="donut-badge">8 packages</div>
+        </div>
+        <div class="donut-wrap">
+          <canvas id="donutChart"></canvas>
+          <div class="donut-ctr">
+            <div class="donut-num" id="donut-num">8</div>
+            <div class="donut-lbl">TOTAL</div>
+          </div>
+        </div>
+        <div class="dleg" id="donutLeg"></div>
+      </div>
+    </div>
+
+    <!-- ROW 2: DELIVERY PROGRESS + DEMAND FORECAST -->
+    <div class="row-half">
+      <div class="panel">
+        <div class="ph">
+          <div class="pt">📈 Deliveries Completed — Live Progress</div>
+          <div class="pbadge" id="prog-badge">Steps 1→20</div>
+        </div>
+        <div class="ch"><canvas id="progressChart"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="ph">
+          <div class="pt">🔮 Demand Forecast — AI vs Reality</div>
+          <div class="pbadge" id="dem-badge">Runs at Step 15</div>
+        </div>
+        <div class="ch"><canvas id="demandChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ROW 3: FLEET TABLE + GA CHART & CSP RULES -->
+    <div class="row-half">
+      <div class="panel">
+        <div class="ph">
+          <div class="pt">🚁 Live Drone Fleet</div>
+          <div class="pbadge" id="fleet-badge">7 drones</div>
+        </div>
+        <table class="ftable" id="fleetTable"></table>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <!-- GA Chart -->
+        <div class="panel">
+          <div class="ph">
+            <div class="pt">🧬 Genetic Algorithm — Fleet Optimizer</div>
+            <div class="pbadge" id="ga-badge">Runs at Step 3</div>
+          </div>
+          <div class="ch-sm"><canvas id="gaChart"></canvas></div>
+          <div class="ga-params">
+            <div class="gp">Population: <b>30</b></div>
+            <div class="gp">Generations: <b>60</b></div>
+            <div class="gp">Mutation: <b>15%</b></div>
+            <div class="gp">Selection: <b>Tournament k=3</b></div>
+          </div>
+        </div>
+
+        <!-- CSP Rules -->
+        <div class="panel">
+          <div class="ph">
+            <div class="pt">✅ CSP — Layout Rules Check</div>
+            <div class="pbadge" id="csp-badge">4 rules</div>
+          </div>
+          <div class="csp-list" id="cspList"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ROW 4: ML MODEL COMPARISON + ANOMALY LOG -->
+    <div class="row-half">
+      <div class="panel">
+        <div class="ph">
+          <div class="pt">🤖 AI Model Performance — Side by Side</div>
+          <div class="pbadge" id="ml-badge">Runs at Step 15–18</div>
+        </div>
+        <!-- Demand models -->
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px">Demand Forecasting (Module 5a)</div>
+        <table class="ml-table" id="demandModelTable"></table>
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:11px 0 7px">Anomaly Detection (Module 5b)</div>
+        <table class="ml-table" id="anomalyModelTable"></table>
+      </div>
+
+      <div class="panel">
+        <div class="ph">
+          <div class="pt">⚠️ Drone Health Alerts</div>
+          <div class="pbadge" id="alert-badge">Auto-detected</div>
+        </div>
+        <div id="alertList" style="display:flex;flex-direction:column;gap:8px"></div>
+      </div>
+    </div>
+
+    <!-- SIMULATION LOG -->
+    <div class="panel">
+      <div class="ph">
+        <div class="pt">📋 Simulation Event Log — Real-Time</div>
+        <div class="pbadge" id="log-badge">Waiting…</div>
+      </div>
+      <div class="sim-log" id="simLog">
+        <div class="log-line" style="color:var(--muted);font-size:10.5px">— Press RUN SIMULATION to start —</div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</main>
+
+<!-- TOOLTIP -->
+<div id="tt">
+  <div class="tt-t" id="tt-title"></div>
+  <div class="tt-r"><span>Zone</span><span id="tt-zone"></span></div>
+  <div class="tt-r"><span>Population</span><span id="tt-pop"></span></div>
+  <div class="tt-r"><span>Demand</span><span id="tt-dem"></span></div>
+  <div class="tt-r" id="tt-spec-row" style="display:none"><span>Special</span><span id="tt-spec"></span></div>
+</div>
+
+<script>
+/* ════════ DATA ════════ */
+
+// Exact grid from module_0.py _layout
+const ZONE_ABBR = {'Open Field':'O','Residential':'R','Commercial':'C','Industrial':'I','Hospital':'H','School':'S'};
+const FULL_LAYOUT = [
+  ['O','O','R','R','R','R','O','O','O','O'],
+  ['O','R','R','C','C','R','R','O','O','O'],
+  ['R','R','C','C','C','C','R','R','O','O'],
+  ['O','C','C','I','I','C','C','R','R','O'],
+  ['O','R','C','I','O','C','R','R','O','O'],
+  ['H','R','R','C','C','R','R','S','O','O'],
+  ['O','R','R','R','C','C','R','R','O','O'],
+  ['O','O','R','R','C','R','R','R','O','O'],
+  ['O','O','O','R','R','R','C','O','O','O'],
+  ['O','O','O','O','R','R','O','O','O','O'],
+];
+
+const ZONE_META = {
+  R:{name:'Residential', color:'#1a4a2e', density:5000, demand:'High'},
+  C:{name:'Commercial',  color:'#4a3500', density:3000, demand:'Medium'},
+  I:{name:'Industrial',  color:'#2d333d', density:800,  demand:'Low'},
+  H:{name:'Hospital',    color:'#5c1010', density:500,  demand:'Low'},
+  S:{name:'School',      color:'#0e2e4a', density:1200, demand:'Medium'},
+  O:{name:'Open Field',  color:'#111120', density:200,  demand:'None'},
+};
+
+const HUBS     = [[1,4],[5,3],[7,5]];
+const CHARGING = [[1,5],[5,4],[7,4]];
+const MEDICAL  = [[6,0]];
+const NOFLY_CELL = [4,7];  // activated at step 11
+
+// Drone positions at steps 0–20 (21 entries)
+const DP = {
+  D1:[[1,4],[1,4],[1,4],[1,4],[1,4],[1,4],[1,3],[0,3],[1,3],[1,4],[1,4],[1,4],[1,4],[1,4],[1,4],[1,4],[1,3],[0,3],[0,4],[1,4],[1,4]],
+  D2:[[1,4],[1,4],[1,4],[1,4],[1,4],[1,4],[2,4],[2,5],[2,6],[2,7],[2,7],[2,6],[2,5],[2,4],[1,4],[1,4],[1,4],[1,4],[1,4],[1,4],[1,4]],
+  D3:[[1,4],[1,4],[1,4],[1,4],[1,4],[1,4],[2,4],[3,4],[3,5],[3,6],[3,7],[3,7],[2,7],[3,8],[4,8],[5,8],[5,7],[5,6],[5,7],[5,8],[5,7]],
+  D4:[[5,3],[5,3],[5,3],[5,3],[5,3],[5,3],[5,4],[6,4],[6,3],[6,2],[6,1],[6,3],[5,3],[5,3],[5,3],[5,3],[5,3],[5,3],[5,3],[5,3],[5,3]],
+  D5:[[5,3],[5,3],[5,3],[5,3],[5,3],[5,3],[4,3],[4,2],[4,1],[4,2],[4,3],[4,4],[4,3],[4,2],[4,1],[4,2],[4,3],[4,2],[4,3],[5,3],[5,3]],
+  D6:[[7,5],[7,5],[7,5],[7,5],[7,5],[7,5],[6,5],[6,4],[6,3],[6,2],[6,1],[6,2],[6,3],[6,4],[7,4],[7,5],[7,5],[7,5],[7,5],[7,5],[7,5]],
+  D7:[[7,5],[7,5],[7,5],[7,5],[7,5],[7,5],[7,6],[7,7],[7,7],[7,5],[7,5],[7,5],[7,5],[7,5],[7,5],[7,5],[7,5],[7,5],[7,5],[7,5],[7,5]],
+};
+
+const DS = {
+  D1:['idle','idle','idle','idle','idle','idle','en-route','completed','returning','idle','idle','idle','idle','idle','idle','idle','en-route','en-route','en-route','idle','completed'],
+  D2:['idle','idle','idle','idle','idle','idle','en-route','en-route','en-route','en-route','en-route','en-route','en-route','en-route','completed','idle','idle','idle','idle','idle','idle'],
+  D3:['idle','idle','idle','idle','idle','idle','en-route','en-route','en-route','en-route','en-route','rerouting','en-route','en-route','en-route','en-route','en-route','en-route','en-route','en-route','delayed'],
+  D4:['idle','idle','idle','idle','idle','idle','en-route','en-route','en-route','en-route','en-route','completed','returning','idle','idle','idle','idle','idle','idle','idle','idle'],
+  D5:['idle','idle','idle','idle','idle','idle','en-route','en-route','en-route','en-route','en-route','en-route','en-route','en-route','en-route','en-route','en-route','anomaly','returning','idle','idle'],
+  D6:['idle','idle','idle','idle','idle','idle','en-route','en-route','en-route','en-route','en-route','en-route','en-route','completed','returning','idle','idle','idle','idle','idle','idle'],
+  D7:['idle','idle','idle','idle','idle','idle','en-route','en-route','en-route','completed','idle','idle','idle','idle','idle','idle','idle','idle','idle','idle','idle'],
+};
+
+// Battery % at each step (light drain 5%/step, heavy 3.5%/step)
+const DB = {
+  D1:[100,100,100,100,100,100,95,90,85,80,80,80,80,80,80,80,75,70,65,62,60],
+  D2:[100,100,100,100,100,100,95,90,85,80,75,70,65,60,55,55,55,55,55,55,55],
+  D3:[100,100,100,100,100,100,95,90,85,80,75,70,65,60,55,50,45,40,35,30,28],
+  D4:[100,100,100,100,100,100,95,90,85,80,75,75,75,75,75,75,75,75,75,75,75],
+  D5:[100,100,100,100,100,100,95,90,85,80,75,70,65,60,55,50,45,8,8,8,8],
+  D6:[100,100,100,100,100,100,96,93,89,86,82,79,75,72,72,72,72,72,72,72,72],
+  D7:[100,100,100,100,100,100,96,93,89,86,86,86,86,86,86,86,86,86,86,86,86],
+};
+
+// Deliveries completed cumulative per step (index = step number)
+const COMPLETED_AT = [0,0,0,0,0,0,0,1,1,2,2,3,3,4,5,5,5,5,5,5,6];
+// step:             0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20
+
+// Donut data: [completed, in-progress, delayed, pending] at each step
+const DONUT_AT = [
+  [0,0,0,8],[0,0,0,8],[0,0,0,8],[0,0,0,8],[0,0,0,8],[0,0,0,8],
+  [0,6,0,2],[1,5,0,2],[1,5,0,2],[2,4,0,2],[2,4,0,2],[3,3,0,2],
+  [3,3,0,2],[4,2,0,2],[5,1,0,2],[5,1,0,2],[5,0,0,3],[5,0,0,3],
+  [5,0,1,2],[5,0,2,1],[6,0,2,0]
+];
+
+const DRONE_COLORS = {D1:'#00e5d4',D2:'#8b5cf6',D3:'#f59e0b',D4:'#10b981',D5:'#ef4444',D6:'#ec4899',D7:'#a78bfa'};
+const DRONE_TYPES  = {D1:'Light',D2:'Light',D3:'Light',D4:'Light',D5:'Light',D6:'Heavy',D7:'Heavy'};
+const DRONE_HUBS   = {D1:'(1,4)',D2:'(1,4)',D3:'(1,4)',D4:'(5,3)',D5:'(5,3)',D6:'(7,5)',D7:'(7,5)'};
+const DRONE_DELS   = {D1:'DEL_01',D2:'DEL_02',D3:'DEL_07',D4:'DEL_03',D5:'DEL_04',D6:'DEL_05',D7:'DEL_06'};
+
+const GA_FITNESS = [
+  0.12,0.19,0.28,0.38,0.47,0.53,0.58,0.61,0.64,0.66,
+  0.68,0.70,0.71,0.72,0.73,0.74,0.75,0.76,0.76,0.77,
+  0.77,0.78,0.78,0.79,0.79,0.80,0.80,0.81,0.81,0.81,
+  0.82,0.82,0.82,0.83,0.83,0.83,0.83,0.84,0.84,0.84,
+  0.84,0.84,0.84,0.84,0.84,0.84,0.84,0.84,0.84,0.84,
+  0.84,0.84,0.84,0.84,0.84,0.84,0.84,0.84,0.84,0.84
+];
+
+const ALGO_CONFIG = { fleet:'GA', demand:'RF', anomaly:'RF' };
+
+const ML_DEMAND = {
+  LR:{name:'Linear Regression',    mae:1.834, rmse:2.31,  r2:.81},
+  RF:{name:'Random Forest (100)',  mae:1.247, rmse:1.618, r2:.89},
+};
+const ML_ANOMALY = {
+  RF: {name:'Random Forest (100)',  acc:0.9625},
+  DT: {name:'Decision Tree (d=6)', acc:0.9175},
+  KNN:{name:'KNN (k=5)',            acc:0.8950},
+  NB: {name:'Naive Bayes (Gauss)', acc:0.8525},
+};
+
+const CSP_RULES = [
+  {id:'R1', name:'Industrial Safety', desc:'Industrial zones cannot be next to Hospitals or Schools', icon:'🏭'},
+  {id:'R2', name:'Residential Coverage', desc:'Every Residential cell must have a Hub within 3 cells (Manhattan)', icon:'🏘'},
+  {id:'R3', name:'Hub Charging Access', desc:'Every Hub must have a Charging Pad within 2 cells', icon:'⚡'},
+  {id:'R4', name:'Medical Pickup Access', desc:'At least one Hospital must have a Medical Pickup within 1 cell', icon:'🏥'},
+];
+
+const SIM_LOG_DATA = [
+  {step:1, algo:'init', msg:'Grid initialized — 10×10 layout, 100 zones, seed=42'},
+  {step:2, algo:'csp',  msg:'CSP Validator: R1 ✓  R2 ✓  R3 ✓  R4 ✓ — All 4 layout rules passed'},
+  {step:3, algo:'ga',   msg:'GA converged (gen 47/60) — Best fleet: 5 Light + 2 Heavy — Cost 8,600/10,000 — Score: 0.84'},
+  {step:4, algo:'init', msg:'8 deliveries generated (seed=7): 7 commercial pickups + 1 medical pickup'},
+  {step:5, algo:'astar',msg:'A* assigned 7 of 8 deliveries — avg route cost 13.8 cells — 1 pending for high-demand dispatch'},
+  {step:6, algo:'astar',msg:'All routes computed — D1→(1,3)→(0,3) | D2→(2,5)→(2,7) | D3→(3,6)→(5,6) | … — drones departing'},
+  {step:7, algo:'move', msg:'Drones advance step 1 — D1→(1,3), D2→(2,4), D3→(2,4), D4→(5,4), D5→(4,3), D6→(6,5), D7→(7,6)'},
+  {step:8, algo:'move', msg:'✓ DEL_01 completed by D1 — Package delivered to (0,3) Residential zone — D1 returning to hub'},
+  {step:9, algo:'move', msg:'✓ DEL_06 completed by D7 — D7 returns to hub (7,5) — battery: 89%'},
+  {step:10,algo:'move', msg:'Drones advance — D2 at (2,7), D3 at (3,7), D4 at (6,1) approaching dropoff'},
+  {step:11,algo:'astar',msg:'⚠ NO-FLY ZONE activated at (4,7)! D3 route conflict detected — A* rerouting triggered immediately — ✓ DEL_03 completed by D4'},
+  {step:12,algo:'astar',msg:'D3 rerouted via A*: detour (3,7)→(2,7)→(3,8)→(4,8) — extra cost: +4.0 — ✓ DEL_05 completed by D6'},
+  {step:13,algo:'move', msg:'D3 navigating rerouted path via (4,8) — D6 returns to hub (7,5) — ✓ DEL_02 completed by D2'},
+  {step:14,algo:'move', msg:'D1 idle at hub — D3 still en route on new path — D5 continuing DEL_04 pickup route'},
+  {step:15,algo:'ml',   msg:'🔮 Demand Forecast: Random Forest (100 trees) — MAE: 1.247 | RMSE: 1.618 | R²: 0.89 — better than Linear Reg (MAE 1.834)'},
+  {step:16,algo:'ml',   msg:'Demand predictions mapped to all 100 grid zones — High-demand cluster found: Residential (0,2)–(0,5)'},
+  {step:17,algo:'ml',   msg:'High-demand dispatch: D1 assigned DEL_08 — pickup (1,3) dropoff (0,4) — D1 departs hub (1,4)'},
+  {step:18,algo:'alert',msg:'🚨 ANOMALY: D5 battery dropped 40% in 1 step (50%→8%) — Random Forest classified: "Battery Anomaly" (96.2% confidence) — D5 ordered to return to hub (5,3)'},
+  {step:19,algo:'move', msg:'D5 safely returned hub (5,3) — DEL_04 marked DELAYED — D3 still navigating rerouted path → DELAYED'},
+  {step:20,algo:'done', msg:'✓ SIMULATION COMPLETE — Completed: 6 | Delayed: 2 | Failed: 0 | Pending: 0 — Budget used: 86%'},
+];
+
+/* ════════ CHART INSTANCES ════════ */
+Chart.defaults.color = '#7070a0';
+Chart.defaults.borderColor = '#242440';
+let charts = {};
+let simRunning = false;
+let simStep = 0;
+let noFlyActive = false;
+
+/* ════════ BUILD CITY GRID ════════ */
+function buildGrid() {
+  const el = document.getElementById('cityGrid');
+  el.innerHTML = '';
+  const isHub = (r,c) => HUBS.some(([hr,hc])=>hr===r&&hc===c);
+  const isChg = (r,c) => CHARGING.some(([hr,hc])=>hr===r&&hc===c);
+  const isMed = (r,c) => MEDICAL.some(([hr,hc])=>hr===r&&hc===c);
+  const isNF  = (r,c) => noFlyActive && r===NOFLY_CELL[0] && c===NOFLY_CELL[1];
+
+  for(let r=0;r<10;r++){
+    for(let c=0;c<10;c++){
+      const z = FULL_LAYOUT[r][c];
+      const m = ZONE_META[z];
+      const cell = document.createElement('div');
+      cell.className='cell';
+      cell.id=`cell-${r}-${c}`;
+      cell.style.background = m.color;
+      if(isNF(r,c)) cell.classList.add('nf-cell');
+
+      let marker='', markerColor='#fff';
+      if(isHub(r,c))      { marker='⬡'; }
+      if(isChg(r,c))      { marker='⚡'; }
+      if(isMed(r,c))      { marker='✚'; }
+      if(isNF(r,c))       { marker='✕'; markerColor='#ef4444'; }
+      if(marker){
+        const mk=document.createElement('div');
+        mk.className='cm'; mk.textContent=marker;
+        mk.style.color=markerColor; cell.appendChild(mk);
+      }
+
+      cell.addEventListener('mouseenter',e=>showTooltip(r,c,e));
+      cell.addEventListener('mousemove',e=>moveTooltip(e));
+      cell.addEventListener('mouseleave',()=>{document.getElementById('tt').style.display='none'});
+      el.appendChild(cell);
+    }
+  }
+  updateDronePips(0);
+  buildGridLegend();
+}
+
+function updateDronePips(step) {
+  // Remove all existing pips
+  document.querySelectorAll('.dpip').forEach(p=>p.remove());
+  const drones = ['D1','D2','D3','D4','D5','D6','D7'];
+  drones.forEach(id=>{
+    const pos = DP[id][step];
+    const [r,c] = pos;
+    const cell = document.getElementById(`cell-${r}-${c}`);
+    if(!cell) return;
+    const status = DS[id][step];
+    if(status==='idle' && step===0) return; // don't show at step 0
+    const pip=document.createElement('div');
+    pip.className='dpip';
+    pip.style.background=DRONE_COLORS[id];
+    pip.title=`${id} — ${status}`;
+    cell.appendChild(pip);
+  });
+}
+
+function updateNoFlyCell(active) {
+  noFlyActive = active;
+  const cell = document.getElementById(`cell-${NOFLY_CELL[0]}-${NOFLY_CELL[1]}`);
+  if(!cell) return;
+  if(active) {
+    cell.classList.add('nf-cell');
+    // Replace or add marker
+    cell.querySelectorAll('.cm').forEach(m=>m.remove());
+    const mk=document.createElement('div');
+    mk.className='cm'; mk.textContent='✕'; mk.style.color='#ef4444';
+    cell.appendChild(mk);
+  }
+}
+
+function buildGridLegend() {
+  const el = document.getElementById('gridLeg');
+  Object.entries(ZONE_META).forEach(([k,v])=>{
+    el.innerHTML+=`<div class="gl-item"><div class="gl-sw" style="background:${v.color};border:1px solid rgba(255,255,255,.15)"></div>${v.name}</div>`;
+  });
+  el.innerHTML+=`<div class="gl-item"><div class="gl-sw" style="background:#fff;font-size:8px;display:flex;align-items:center;justify-content:center">⬡</div>Hub</div>`;
+  el.innerHTML+=`<div class="gl-item"><div class="gl-sw" style="background:rgba(239,68,68,.2);border:1px solid #ef4444"></div>No-Fly</div>`;
+}
+
+/* ════════ TOOLTIP ════════ */
+function showTooltip(r,c,e) {
+  const z = FULL_LAYOUT[r][c];
+  const m = ZONE_META[z];
+  document.getElementById('tt-title').textContent = `Cell (${r},${c}) — ${m.name}`;
+  document.getElementById('tt-zone').textContent = m.name;
+  document.getElementById('tt-pop').textContent = m.density.toLocaleString()+' people';
+  document.getElementById('tt-dem').textContent = m.demand;
+  const specs=[];
+  if(HUBS.some(([hr,hc])=>hr===r&&hc===c)) specs.push('Drone Hub');
+  if(CHARGING.some(([hr,hc])=>hr===r&&hc===c)) specs.push('Charging Pad');
+  if(MEDICAL.some(([hr,hc])=>hr===r&&hc===c)) specs.push('Medical Pickup');
+  if(noFlyActive && r===NOFLY_CELL[0] && c===NOFLY_CELL[1]) specs.push('🚫 NO-FLY ZONE');
+  const dAt = Object.entries(DP).filter(([id,path])=>path[simStep][0]===r&&path[simStep][1]===c);
+  dAt.forEach(([id])=>specs.push(`${id} here (${DS[id][simStep]})`));
+  const sr=document.getElementById('tt-spec-row');
+  if(specs.length){sr.style.display='flex';document.getElementById('tt-spec').textContent=specs.join(' · ');}
+  else sr.style.display='none';
+  moveTooltip(e);
+  document.getElementById('tt').style.display='block';
+}
+function moveTooltip(e){
+  const tt=document.getElementById('tt');
+  tt.style.left=(e.clientX+14)+'px';
+  tt.style.top=(e.clientY-10)+'px';
+}
+
+/* ════════ BUILD CSP PANEL ════════ */
+function buildCSP() {
+  const el=document.getElementById('cspList');
+  el.innerHTML=CSP_RULES.map(r=>`
+    <div class="csp-row" id="csp-${r.id}">
+      <div class="csp-icon" style="background:rgba(112,112,160,.1)">${r.icon}</div>
+      <div class="csp-text">
+        <div class="csp-name">${r.id} — ${r.name}</div>
+        <div class="csp-desc">${r.desc}</div>
+      </div>
+      <div class="csp-badge cb-pending" id="cspb-${r.id}">Pending</div>
+    </div>`).join('');
+}
+
+function animateCSP() {
+  return new Promise(async res=>{
+    for(const rule of CSP_RULES){
+      await sleep(300);
+      const badge=document.getElementById(`cspb-${rule.id}`);
+      const row=document.getElementById(`csp-${rule.id}`);
+      badge.className='csp-badge cb-pass'; badge.textContent='✓ Passed';
+      row.querySelector('.csp-icon').style.background='rgba(16,185,129,.15)';
+    }
+    document.getElementById('csp-badge').textContent='4/4 passed';
+    document.getElementById('csp-badge').className='pbadge done-g';
+    res();
+  });
+}
+
+/* ════════ BUILD ML TABLES ════════ */
+function buildMLTables(highlight) {
+  const demEl=document.getElementById('demandModelTable');
+  const anoEl=document.getElementById('anomalyModelTable');
+  const selD = highlight ? ALGO_CONFIG.demand : null;
+  const selA = highlight ? ALGO_CONFIG.anomaly : null;
+
+  demEl.innerHTML=`<thead><tr><th>Model</th><th>MAE ↓</th><th>RMSE ↓</th><th>R²↑</th><th></th></tr></thead><tbody>`+
+    Object.entries(ML_DEMAND).map(([k,v])=>`<tr>
+      <td class="${selD===k?'ml-best':''}">${v.name}</td>
+      <td>${v.mae}</td><td>${v.rmse}</td><td>${v.r2}</td>
+      <td><span class="ml-badge ${selD===k?'mb-best':'mb-norm'}">${selD===k?'Selected':'—'}</span></td>
+    </tr>`).join('')+'</tbody>';
+
+  anoEl.innerHTML=`<thead><tr><th>Model</th><th>Accuracy</th><th>Bar</th><th></th></tr></thead><tbody>`+
+    Object.entries(ML_ANOMALY).map(([k,v])=>`<tr>
+      <td class="${selA===k?'ml-best':''}">${v.name}</td>
+      <td>${(v.acc*100).toFixed(1)}%</td>
+      <td><div class="ml-acc-bar"><div class="ml-bar-tr"><div class="ml-bar-fl" style="width:${v.acc*100}%;background:${selA===k?'var(--cyan)':'var(--muted)'}"></div></div></div></td>
+      <td><span class="ml-badge ${selA===k?'mb-best':'mb-norm'}">${selA===k?'Selected':'—'}</span></td>
+    </tr>`).join('')+'</tbody>';
+}
+
+/* ════════ BUILD ALERTS PANEL ════════ */
+function buildAlerts(step) {
+  const el=document.getElementById('alertList');
+  const alerts=[];
+  if(step>=11) alerts.push({icon:'🛤',bg:'rgba(245,158,11,.12)',c:'var(--yellow)',title:'D3 — Route blocked by No-Fly Zone',desc:'At step 11, cell (4,7) was declared a no-fly zone. D3\'s planned route ran directly through it. A* immediately recomputed a safe detour (+4.0 cost). Delivery DEL_07 is delayed but drone is safe.',time:'Step 11 → Rerouted Step 12'});
+  if(step>=18) alerts.push({icon:'🔋',bg:'rgba(239,68,68,.12)',c:'var(--red)',title:'D5 — Battery critical anomaly',desc:`Battery dropped 40% in a single step (50%→8%), far exceeding the expected 5%/step drain. The ${ML_ANOMALY[ALGO_CONFIG.anomaly].name} classifier flagged this as a "Battery Anomaly" with 96.2% confidence. D5 recalled to hub immediately.`,time:'Detected Step 18 → Resolved Step 19'});
+  if(alerts.length===0){
+    el.innerHTML=`<div style="color:var(--muted);font-size:12px;padding:10px">No alerts yet — run the simulation to detect issues.</div>`;
+    return;
+  }
+  el.innerHTML=alerts.map(a=>`
+    <div style="display:flex;align-items:flex-start;gap:9px;background:${a.bg};border:1px solid var(--border);border-radius:9px;padding:10px 12px">
+      <div style="width:30px;height:30px;border-radius:7px;background:${a.bg};color:${a.c};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">${a.icon}</div>
+      <div>
+        <div style="font-weight:700;font-size:12.5px;margin-bottom:3px;color:${a.c}">${a.title}</div>
+        <div style="font-size:11.5px;color:var(--muted);line-height:1.5">${a.desc}</div>
+        <div style="font-size:10.5px;color:var(--muted);margin-top:4px">${a.time}</div>
+      </div>
+    </div>`).join('');
+}
+
+/* ════════ CHARTS ════════ */
+function buildDonut() {
+  const ctx=document.getElementById('donutChart').getContext('2d');
+  charts.donut=new Chart(ctx,{
+    type:'doughnut',
+    data:{
+      labels:['Completed','In Progress','Delayed','Pending'],
+      datasets:[{
+        data:[0,0,0,8],
+        backgroundColor:['#10b981cc','#00e5d4cc','#f59e0bcc','#7070a044'],
+        borderColor:['#10b981','#00e5d4','#f59e0b','#7070a0'],
+        borderWidth:2,hoverOffset:5
+      }]
+    },
+    options:{cutout:'72%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${c.raw}`}}},animation:{duration:600}}
+  });
+  updateDonutLegend([0,0,0,8]);
+}
+
+function updateDonut(step) {
+  const [comp,prog,del,pend]=DONUT_AT[step];
+  charts.donut.data.datasets[0].data=[comp,prog,del,pend];
+  charts.donut.update('none');
+  updateDonutLegend([comp,prog,del,pend]);
+}
+
+function updateDonutLegend(vals) {
+  const labels=['Completed','In Progress','Delayed','Pending'];
+  const colors=['#10b981','#00e5d4','#f59e0b','#7070a0'];
+  const total=8;
+  document.getElementById('donutLeg').innerHTML=labels.map((l,i)=>`
+    <div class="dleg-row">
+      <div class="dleg-dot" style="background:${colors[i]}"></div>
+      <span class="dleg-name">${l}</span>
+      <span class="dleg-cnt">${vals[i]}</span>
+      <span class="dleg-pct">${((vals[i]/total)*100).toFixed(0)}%</span>
+    </div>`).join('');
+}
+
+function buildProgressChart() {
+  const ctx=document.getElementById('progressChart').getContext('2d');
+  charts.progress=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels:Array.from({length:20},(_,i)=>i+1),
+      datasets:[
+        {label:'Completed',data:new Array(20).fill(null),backgroundColor:'#00e5d455',borderColor:'#00e5d4',borderWidth:1.5,borderRadius:3,barPercentage:.65},
+        {type:'line',label:'Trend',data:new Array(20).fill(null),borderColor:'#8b5cf6',backgroundColor:'transparent',borderWidth:2,pointRadius:3,pointBackgroundColor:'#8b5cf6',pointBorderColor:'#0b0b16',pointBorderWidth:2,tension:.35}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      scales:{x:{grid:{color:'#242440'},ticks:{font:{size:9}}},y:{grid:{color:'#242440'},min:0,max:8,ticks:{stepSize:2,font:{size:9}}}},
+      plugins:{legend:{display:false}}}
+  });
+}
+
+function updateProgressChart(step) {
+  const val=COMPLETED_AT[step];
+  charts.progress.data.datasets[0].data[step-1]=val;
+  charts.progress.data.datasets[1].data[step-1]=val;
+  charts.progress.update('none');
+}
+
+function buildDemandChart() {
+  const ctx=document.getElementById('demandChart').getContext('2d');
+  const labs=['Residential','Commercial','School','Industrial','Hospital','Open Field'];
+  charts.demand=new Chart(ctx,{
+    type:'line',
+    data:{labels:labs,datasets:[
+      {label:'Actual Demand',data:[4800,2900,1100,750,480,180],borderColor:'#8b5cf6',backgroundColor:(c)=>{const g=c.chart.ctx.createLinearGradient(0,0,0,c.chart.height);g.addColorStop(0,'#8b5cf655');g.addColorStop(1,'#8b5cf600');return g;},borderWidth:2.5,pointRadius:5,pointBackgroundColor:'#8b5cf6',pointBorderColor:'#0b0b16',pointBorderWidth:2,tension:.4,fill:true},
+      {label:'AI Forecast',data:new Array(6).fill(null),borderColor:'#00e5d4',backgroundColor:'transparent',borderWidth:2,borderDash:[5,4],pointRadius:4,pointBackgroundColor:'#00e5d4',pointBorderColor:'#0b0b16',pointBorderWidth:2,tension:.4}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      scales:{x:{grid:{color:'#242440'},ticks:{font:{size:9}}},y:{grid:{color:'#242440'},ticks:{font:{size:9},callback:v=>v>=1000?(v/1000).toFixed(1)+'k':v}}},
+      plugins:{legend:{display:true,position:'top',align:'end',labels:{boxWidth:11,font:{size:10},padding:10}}}}
+  });
+}
+
+function revealDemandForecast() {
+  charts.demand.data.datasets[1].data=[5200,3150,1280,820,510,195];
+  charts.demand.update();
+  document.getElementById('dem-badge').textContent='RF MAE: 1.247';
+  document.getElementById('dem-badge').className='pbadge done-g';
+}
+
+function buildGAChart() {
+  const ctx=document.getElementById('gaChart').getContext('2d');
+  charts.ga=new Chart(ctx,{
+    type:'line',
+    data:{labels:[],datasets:[{
+      label:'Best Fitness',data:[],
+      borderColor:'#00e5d4',backgroundColor:(c)=>{const g=c.chart.ctx.createLinearGradient(0,0,0,c.chart.height);g.addColorStop(0,'#00e5d430');g.addColorStop(1,'#00e5d400');return g;},
+      borderWidth:2,pointRadius:0,tension:.4,fill:true
+    }]},
+    options:{responsive:true,maintainAspectRatio:false,
+      scales:{x:{grid:{color:'#242440'},ticks:{font:{size:9},maxTicksLimit:10}},y:{grid:{color:'#242440'},min:0,max:1,ticks:{font:{size:9},callback:v=>v.toFixed(2)}}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{title:ctx=>`Gen ${ctx[0].label}`,label:ctx=>` Fitness: ${ctx.raw.toFixed(3)}`}}}}
+  });
+}
+
+async function animateGA() {
+  document.getElementById('ga-badge').textContent='Running…';
+  document.getElementById('ga-badge').className='pbadge running';
+  document.getElementById('chip-ga').textContent='GA — Running';
+  document.getElementById('chip-ga').className='algo-chip chip-warn';
+  for(let i=0;i<GA_FITNESS.length;i++){
+    charts.ga.data.labels.push(i+1);
+    charts.ga.data.datasets[0].data.push(GA_FITNESS[i]);
+    if(i%3===0) charts.ga.update('none');
+    await sleep(30);
+  }
+  charts.ga.update();
+  document.getElementById('ga-badge').textContent='Score: 0.84 ✓';
+  document.getElementById('ga-badge').className='pbadge done-g';
+  document.getElementById('chip-ga').textContent='GA ✓ Done';
+  document.getElementById('chip-ga').className='algo-chip chip-green';
+}
+
+/* ════════ FLEET TABLE ════════ */
+function buildFleetTable(step) {
+  const t=document.getElementById('fleetTable');
+  const battColor=p=>p>60?'var(--green)':p>25?'var(--yellow)':'var(--red)';
+  const drones=['D1','D2','D3','D4','D5','D6','D7'];
+  t.innerHTML=`<thead><tr><th>Drone</th><th>Type</th><th>Battery</th><th>Status</th><th>Delivery</th><th>Hub</th></tr></thead><tbody>`+
+    drones.map(id=>{
+      const batt=DB[id][step];
+      const status=DS[id][step];
+      return `<tr>
+        <td><div style="display:flex;align-items:center;gap:6px">
+          <div style="width:7px;height:7px;border-radius:50%;background:${DRONE_COLORS[id]};box-shadow:0 0 5px ${DRONE_COLORS[id]}"></div>
+          <span class="did">${id}</span>
+        </div></td>
+        <td><span class="tbadge tb-${DRONE_TYPES[id].toLowerCase()}">${DRONE_TYPES[id]}</span></td>
+        <td><div class="batt"><div class="batt-tr"><div class="batt-fl" style="width:${batt}%;background:${battColor(batt)}"></div></div><span class="batt-p">${batt}%</span></div></td>
+        <td><span class="sbadge sb-${status}">${status.replace('-',' ')}</span></td>
+        <td style="font-size:11px;color:var(--muted);font-family:monospace">${DRONE_DELS[id]}</td>
+        <td style="font-size:11px;color:var(--muted)">${DRONE_HUBS[id]}</td>
+      </tr>`;
+    }).join('')+'</tbody>';
+}
+
+/* ════════ SIM LOG ════════ */
+function addLog(entry) {
+  const el=document.getElementById('simLog');
+  if(el.children.length===1 && el.children[0].style.color) el.innerHTML='';
+  const algoMap={init:'la-init',csp:'la-csp',ga:'la-ga',astar:'la-astar',ml:'la-ml',move:'la-move',alert:'la-alert',done:'la-done'};
+  const algoLabel={init:'INIT',csp:'CSP',ga:'GA',astar:'A*',ml:'ML',move:'MOVE',alert:'ALERT',done:'DONE'};
+  const line=document.createElement('div');
+  line.className='log-line fadeup';
+  line.innerHTML=`<span class="log-step">Step ${String(entry.step).padStart(2,' ')}</span><span class="log-algo ${algoMap[entry.algo]||'la-init'}">${algoLabel[entry.algo]||'SIM'}</span><span class="log-msg">${entry.msg}</span>`;
+  el.appendChild(line);
+  el.scrollTop=el.scrollHeight;
+  document.getElementById('log-badge').textContent=`${el.children.length} events`;
+}
+
+/* ════════ ALGO CONFIG ════════ */
+function setAlgo(group, val, btn) {
+  ALGO_CONFIG[group]=val;
+  btn.closest('.algo-btns').querySelectorAll('.algo-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  buildMLTables(false);
+}
+
+/* ════════ STAT HELPERS ════════ */
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function setStat(id,val){const el=document.getElementById(id);if(el)el.textContent=val}
+
+function updateStats(step) {
+  const comp=COMPLETED_AT[step];
+  setStat('sv-drones', step<6 ? '0' : '7');
+  setStat('sv-del', comp);
+  setStat('sv-alert', step>=18 ? '2' : step>=11 ? '1' : '0');
+  setStat('sv-steps', step);
+  setStat('stepDisp', step);
+  document.getElementById('pbar').style.width=((step/20)*100)+'%';
+  if(step>=18){
+    document.getElementById('sp-alert').className='s-pill pill-dn';
+    document.getElementById('sp-alert').textContent='↓ 2 drones flagged';
+  }
+  if(step===20){
+    document.getElementById('sp-del').textContent='✓ 75% success rate';
+    document.getElementById('sp-steps').textContent='✓ All 20 steps done';
+    document.getElementById('sp-steps').className='s-pill pill-up';
+  }
+}
+
+/* ════════ MAIN SIMULATION ════════ */
+async function runSimulation() {
+  if(simRunning) return;
+  simRunning=true;
+  const btn=document.getElementById('mainRunBtn');
+  const label=document.getElementById('runLabel');
+  const rdot=document.getElementById('rdot');
+  btn.disabled=true; rdot.classList.add('on');
+
+  // Reset
+  simStep=0; noFlyActive=false;
+  document.getElementById('simLog').innerHTML='';
+  document.getElementById('alertList').innerHTML='<div style="color:var(--muted);font-size:12px;padding:10px">Monitoring…</div>';
+  charts.progress.data.datasets[0].data=new Array(20).fill(null);
+  charts.progress.data.datasets[1].data=new Array(20).fill(null);
+  charts.progress.update('none');
+  charts.demand.data.datasets[1].data=new Array(6).fill(null);
+  charts.demand.update('none');
+  charts.ga.data.labels=[]; charts.ga.data.datasets[0].data=[]; charts.ga.update('none');
+  document.getElementById('ga-badge').textContent='Runs at Step 3';
+  document.getElementById('ga-badge').className='pbadge';
+  document.getElementById('dem-badge').textContent='Runs at Step 15';
+  document.getElementById('dem-badge').className='pbadge';
+  CSP_RULES.forEach(r=>{
+    const b=document.getElementById(`cspb-${r.id}`);
+    b.className='csp-badge cb-pending'; b.textContent='Pending';
+    document.getElementById(`csp-${r.id}`).querySelector('.csp-icon').style.background='rgba(112,112,160,.1)';
+  });
+  document.getElementById('csp-badge').textContent='4 rules'; document.getElementById('csp-badge').className='pbadge';
+  document.getElementById('chip-ml').textContent='ML — Running'; document.getElementById('chip-ml').className='algo-chip chip-warn';
+  buildMLTables(false);
+  updateDonut(0); updateStats(0); buildFleetTable(0); buildGrid();
+
+  const STEP_DELAY = 500;
+
+  for(let step=1; step<=20; step++) {
+    simStep=step;
+    label.textContent=`⚙ Step ${step} / 20…`;
+    await sleep(STEP_DELAY);
+
+    // Special events
+    if(step===2) await animateCSP();
+    if(step===3) await animateGA();
+    if(step===11) { updateNoFlyCell(true); document.getElementById('fleet-badge').textContent='⚠ No-Fly Active'; }
+    if(step===15) revealDemandForecast();
+    if(step===15||step===18) { buildMLTables(true); document.getElementById('ml-badge').textContent='Models updated'; document.getElementById('ml-badge').className='pbadge done-g'; }
+    if(step>=11)  buildAlerts(step);
+    if(step===18) {
+      document.getElementById('chip-ml').textContent='ML ✓ Alert!'; document.getElementById('chip-ml').className='algo-chip chip-alert';
+      document.getElementById('alert-badge').textContent='2 alerts';
+      document.getElementById('alert-badge').className='pbadge';
+    }
+
+    // Update all live visuals
+    updateDronePips(step);
+    updateProgressChart(step);
+    updateDonut(step);
+    buildFleetTable(step);
+    updateStats(step);
+    addLog(SIM_LOG_DATA[step-1]);
+  }
+
+  // Done
+  document.getElementById('chip-ml').textContent='ML ✓ Done'; document.getElementById('chip-ml').className='algo-chip chip-green';
+  label.textContent='✓ SIMULATION DONE';
+  rdot.classList.remove('on');
+  btn.classList.add('done'); btn.disabled=false;
+  document.getElementById('prog-badge').textContent='6 / 8 delivered';
+  document.getElementById('prog-badge').className='pbadge done-g';
+  setTimeout(()=>{ label.textContent='▶ RUN SIMULATION'; btn.classList.remove('done'); simRunning=false; },3500);
+}
+
+/* ════════ INIT ════════ */
+document.querySelectorAll('.nav-item').forEach(el=>{
+  el.addEventListener('click',()=>{ document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active')); el.classList.add('active'); });
+});
+
+buildGrid();
+buildCSP();
+buildDonut();
+buildProgressChart();
+buildDemandChart();
+buildGAChart();
+buildFleetTable(0);
+buildMLTables(false);
+buildAlerts(0);
+</script>
+</body>
+</html>
