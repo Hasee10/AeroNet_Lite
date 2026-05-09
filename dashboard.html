@@ -351,7 +351,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
           <div class="pt">🗺 City Grid — 10×10 Smart Layout</div>
           <div class="pbadge">Hover any cell for details</div>
         </div>
-        <div class="city-grid" id="cityGrid"></div>
+        <div style="position:relative">
+          <div class="city-grid" id="cityGrid"></div>
+          <svg id="pathSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:10;overflow:visible"></svg>
+        </div>
         <div class="grid-leg" id="gridLeg"></div>
       </div>
 
@@ -670,6 +673,112 @@ function updateDronePips(step) {
     pip.title=`${id} — ${status}`;
     cell.appendChild(pip);
   });
+}
+
+function updateDronePaths(step) {
+  const svg = document.getElementById('pathSvg');
+  if (!svg) return;
+  svg.innerHTML = '';
+  if (step < 6) return;
+
+  svg.setAttribute('viewBox', '0 0 10 10');
+  svg.setAttribute('preserveAspectRatio', 'none');
+
+  const pt = (r, c) => `${c + 0.5},${r + 0.5}`;
+
+  Object.entries(DP).forEach(([id, positions]) => {
+    const pts = [];
+    for (let s = 6; s <= step; s++) {
+      const [r, c] = positions[s];
+      const key = `${r},${c}`;
+      if (!pts.length || pts[pts.length - 1].key !== key)
+        pts.push({ r, c, key });
+    }
+    if (pts.length < 2) return;
+
+    const color = DRONE_COLORS[id];
+    const pointStr = pts.map(p => pt(p.r, p.c)).join(' ');
+
+    const mkPoly = (w, op, dash, events) => {
+      const el = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+      el.setAttribute('points', pointStr);
+      el.setAttribute('stroke', color);
+      el.setAttribute('stroke-width', w);
+      el.setAttribute('stroke-opacity', op);
+      el.setAttribute('fill', 'none');
+      el.setAttribute('stroke-linecap', 'round');
+      el.setAttribute('stroke-linejoin', 'round');
+      if (dash) el.setAttribute('stroke-dasharray', dash);
+      el.style.pointerEvents = events ? 'stroke' : 'none';
+      return el;
+    };
+
+    svg.appendChild(mkPoly('0.35', '0.2',  null,     false)); // glow
+    svg.appendChild(mkPoly('0.12', '0.9',  '0.35,0.2', false)); // dashed line
+
+    // Start dot
+    const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    dot.setAttribute('cx', pts[0].c + 0.5); dot.setAttribute('cy', pts[0].r + 0.5);
+    dot.setAttribute('r', '0.18'); dot.setAttribute('fill', color);
+    dot.setAttribute('fill-opacity', '0.7'); dot.style.pointerEvents = 'none';
+    svg.appendChild(dot);
+
+    // Invisible wide hit-area for hover
+    const hit = mkPoly('0.7', '0', null, true);
+    hit.style.cursor = 'crosshair';
+    hit.addEventListener('mouseenter', e => showPathTooltip(id, step, e));
+    hit.addEventListener('mousemove',  e => moveTooltip(e));
+    hit.addEventListener('mouseleave', () => { document.getElementById('tt').style.display = 'none'; });
+    svg.appendChild(hit);
+  });
+}
+
+function showPathTooltip(droneId, step, e) {
+  const status  = DS[droneId][step] || 'idle';
+  const batt    = DB[droneId][step];
+  const type    = DRONE_TYPES[droneId];
+  const delId   = DRONE_DELS[droneId];
+  const hub     = DRONE_HUBS[droneId];
+  const color   = DRONE_COLORS[droneId];
+  const pos     = DP[droneId][step];
+
+  const statusDesc = {
+    'idle'      : 'At hub — awaiting dispatch',
+    'en-route'  : '✈  Flying to delivery target',
+    'completed' : '✓  Delivery completed',
+    'returning' : '↩  Returning to hub',
+    'rerouting' : '⚠  Rerouting around No-Fly Zone',
+    'anomaly'   : '🚨  Battery anomaly — recalled',
+    'delayed'   : '⏸  Delivery delayed',
+  };
+
+  const purposeDesc = {
+    D1:'Residential delivery — northern zone',
+    D2:'Commercial delivery — east corridor',
+    D3:'Commercial delivery — east zone (detoured)',
+    D4:'Commercial delivery — south-west zone',
+    D5:'Commercial pickup — battery anomaly at step 17',
+    D6:'Medical/commercial delivery — south hub',
+    D7:'Commercial delivery — east of south hub',
+  };
+
+  const tt = document.getElementById('tt');
+  document.getElementById('tt-title').innerHTML =
+    `<span style="color:${color};font-size:15px">●</span> &nbsp;${droneId} — ${type} Drone`;
+
+  const rows = tt.querySelectorAll('.tt-r');
+  rows[0].children[0].textContent = 'Delivery';
+  rows[0].children[1].textContent = delId;
+  rows[1].children[0].textContent = 'Status';
+  rows[1].children[1].textContent = statusDesc[status] || status;
+  rows[2].children[0].textContent = 'Purpose';
+  rows[2].children[1].textContent = purposeDesc[droneId] || '—';
+  rows[3].style.display = 'flex';
+  rows[3].children[0].textContent = 'Battery / Hub';
+  rows[3].children[1].textContent = `${batt}%  ·  Hub ${hub}  ·  Pos (${pos[0]},${pos[1]})`;
+
+  moveTooltip(e);
+  tt.style.display = 'block';
 }
 
 function updateNoFlyCell(active) {
@@ -1013,6 +1122,7 @@ async function runSimulation() {
   document.getElementById('chip-ml').textContent='ML — Running'; document.getElementById('chip-ml').className='algo-chip chip-warn';
   buildMLTables(false);
   updateDonut(0); updateStats(0); buildFleetTable(0); buildGrid();
+  document.getElementById('pathSvg').innerHTML = '';
 
   const STEP_DELAY = 500;
 
@@ -1036,6 +1146,7 @@ async function runSimulation() {
 
     // Update all live visuals
     updateDronePips(step);
+    updateDronePaths(step);
     updateProgressChart(step);
     updateDonut(step);
     buildFleetTable(step);
