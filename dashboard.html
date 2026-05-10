@@ -207,6 +207,45 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 .fadeup{animation:fadeUp .3s ease}
+
+/* ── SIM CONTROLS ── */
+.ctrl-btn{font-size:11px;font-weight:700;padding:5px 10px;border-radius:6px;cursor:pointer;border:1px solid var(--border);background:var(--card);color:var(--muted);transition:all .15s;white-space:nowrap}
+.ctrl-btn:hover:not(:disabled){border-color:rgba(255,255,255,.3);color:var(--text)}
+.ctrl-btn.c-pause{border-color:var(--yellow);color:var(--yellow);background:rgba(245,158,11,.07)}
+.ctrl-btn.c-nfly{border-color:var(--red);color:var(--red);background:rgba(239,68,68,.07)}
+.ctrl-btn.c-anom{border-color:var(--pink);color:var(--pink);background:rgba(236,72,153,.07)}
+.ctrl-btn.c-reset{border-color:var(--purple);color:var(--purple);background:rgba(139,92,246,.07)}
+.ctrl-btn:disabled{opacity:.35;cursor:not-allowed}
+
+/* ── DEMAND HEATMAP ── */
+.hmap-grid{display:grid;grid-template-columns:repeat(10,1fr);gap:2px}
+.hmap-cell{aspect-ratio:1;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:7px;font-weight:800;color:rgba(255,255,255,.9);transition:background .6s,transform .1s;position:relative;cursor:default}
+.hmap-cell:hover{transform:scale(1.15);z-index:20}
+.hmap-cell.locked{background:var(--card2)!important;border:1px dashed rgba(36,36,64,.7)}
+.hmap-legend{margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+.hmap-grad{height:8px;border-radius:4px;background:linear-gradient(90deg,#0d1b2a,#0e4d6b,#00998a,#00e5d4);margin-bottom:4px}
+.hmap-glabs{display:flex;justify-content:space-between;font-size:9px;color:var(--muted)}
+
+/* ── MODULE TAGS ── */
+.mod-tag{font-size:9px;font-weight:800;padding:2px 7px;border-radius:4px;letter-spacing:.3px;flex-shrink:0}
+.mt1{background:rgba(16,185,129,.12);color:var(--green);border:1px solid rgba(16,185,129,.3)}
+.mt2{background:rgba(0,229,212,.1);color:var(--cyan);border:1px solid rgba(0,229,212,.3)}
+.mt3{background:rgba(139,92,246,.1);color:var(--purple);border:1px solid rgba(139,92,246,.3)}
+.mt4{background:rgba(245,158,11,.1);color:var(--yellow);border:1px solid rgba(245,158,11,.3)}
+.mt5{background:rgba(236,72,153,.1);color:var(--pink);border:1px solid rgba(236,72,153,.3)}
+
+/* ── FINAL SUMMARY ── */
+.sum-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px}
+.sum-card{background:var(--card2);border:1px solid var(--border);border-radius:9px;padding:12px;text-align:center}
+.sum-val{font-size:26px;font-weight:800;line-height:1;margin-bottom:3px}
+.sum-lbl{font-size:9.5px;color:var(--muted);font-weight:600;letter-spacing:.4px;text-transform:uppercase}
+.msr{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;padding:5px 0;border-bottom:1px solid rgba(36,36,64,.5)}
+.msr:last-child{border-bottom:none}
+
+/* ── PAUSE OVERLAY ── */
+#pauseOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9998;align-items:center;justify-content:center;flex-direction:column;gap:10px;backdrop-filter:blur(4px)}
+.pause-txt{font-size:56px;font-weight:900;color:var(--yellow);letter-spacing:6px;animation:blink 1.1s infinite}
+.pause-sub{font-size:13px;color:var(--muted);font-weight:600}
 </style>
 </head>
 <body>
@@ -305,6 +344,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
       <div class="step-badge">Step <b id="stepDisp">0</b> / 20</div>
       <div class="iBtn">🌙</div>
       <div class="iBtn">🔔<div class="notif-pip"></div></div>
+      <button class="ctrl-btn c-pause" id="pauseBtn" onclick="togglePause()" disabled title="Pause / Resume">⏸ Pause</button>
+      <button class="ctrl-btn c-nfly"  id="nflyBtn"  onclick="injectNoFly()"  disabled title="Manually activate No-Fly Zone">✕ No-Fly</button>
+      <button class="ctrl-btn c-anom"  id="anomBtn"  onclick="injectAnomaly()" disabled title="Trigger D5 battery anomaly">🔋 Anomaly</button>
+      <button class="ctrl-btn c-reset" id="resetBtn" onclick="resetSim()" title="Reset simulation">↺ Reset</button>
       <button class="run-btn" id="mainRunBtn" onclick="runSimulation()">
         <span class="rdot" id="rdot"></span>
         <span id="runLabel">▶ RUN SIMULATION</span>
@@ -378,17 +421,30 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
     <div class="row-half">
       <div class="panel">
         <div class="ph">
-          <div class="pt">📈 Deliveries Completed — Live Progress</div>
+          <div style="display:flex;align-items:center;gap:7px"><span class="mod-tag mt4">M4</span><div class="pt">📈 Deliveries Completed — Live Progress</div></div>
           <div class="pbadge" id="prog-badge">Steps 1→20</div>
         </div>
         <div class="ch"><canvas id="progressChart"></canvas></div>
       </div>
       <div class="panel">
         <div class="ph">
-          <div class="pt">🔮 Demand Forecast — AI vs Reality</div>
+          <div style="display:flex;align-items:center;gap:7px"><span class="mod-tag mt5">M5a</span><div class="pt">🔮 Demand Forecast — AI vs Reality</div></div>
           <div class="pbadge" id="dem-badge">Runs at Step 15</div>
         </div>
         <div class="ch"><canvas id="demandChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ROW 2.5: DEMAND HEATMAP -->
+    <div class="panel">
+      <div class="ph">
+        <div style="display:flex;align-items:center;gap:7px"><span class="mod-tag mt5">M5a</span><div class="pt">🌡 Demand Heatmap — Zone Intensity (RF Forecast)</div></div>
+        <div class="pbadge" id="hmap-badge">Unlocks at Step 15</div>
+      </div>
+      <div class="hmap-grid" id="hmapGrid"></div>
+      <div class="hmap-legend">
+        <div class="hmap-grad"></div>
+        <div class="hmap-glabs"><span>Low demand</span><span>Medium</span><span>High demand</span></div>
       </div>
     </div>
 
@@ -396,7 +452,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
     <div class="row-half">
       <div class="panel">
         <div class="ph">
-          <div class="pt">🚁 Live Drone Fleet</div>
+          <div style="display:flex;align-items:center;gap:7px"><span class="mod-tag mt4">M4</span><div class="pt">🚁 Live Drone Fleet</div></div>
           <div class="pbadge" id="fleet-badge">7 drones</div>
         </div>
         <table class="ftable" id="fleetTable"></table>
@@ -406,7 +462,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
         <!-- GA Chart -->
         <div class="panel">
           <div class="ph">
-            <div class="pt">🧬 Genetic Algorithm — Fleet Optimizer</div>
+            <div style="display:flex;align-items:center;gap:7px"><span class="mod-tag mt2">M2</span><div class="pt">🧬 Genetic Algorithm — Fleet Optimizer</div></div>
             <div class="pbadge" id="ga-badge">Runs at Step 3</div>
           </div>
           <div class="ch-sm"><canvas id="gaChart"></canvas></div>
@@ -421,7 +477,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
         <!-- CSP Rules -->
         <div class="panel">
           <div class="ph">
-            <div class="pt">✅ CSP — Layout Rules Check</div>
+            <div style="display:flex;align-items:center;gap:7px"><span class="mod-tag mt1">M1</span><div class="pt">✅ CSP — Layout Rules Check</div></div>
             <div class="pbadge" id="csp-badge">4 rules</div>
           </div>
           <div class="csp-list" id="cspList"></div>
@@ -433,7 +489,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
     <div class="row-half">
       <div class="panel">
         <div class="ph">
-          <div class="pt">🤖 AI Model Performance — Side by Side</div>
+          <div style="display:flex;align-items:center;gap:7px"><span class="mod-tag mt5">M5</span><div class="pt">🤖 AI Model Performance — Side by Side</div></div>
           <div class="pbadge" id="ml-badge">Runs at Step 15–18</div>
         </div>
         <!-- Demand models -->
@@ -463,8 +519,33 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
       </div>
     </div>
 
+    <!-- FINAL SUMMARY (shown on sim complete) -->
+    <div class="panel" id="summaryPanel" style="display:none;border-color:var(--cyan)">
+      <div class="ph">
+        <div class="pt">🏁 Simulation Complete — Final Results</div>
+        <div class="pbadge done-g">All 5 Modules Executed</div>
+      </div>
+      <div class="sum-grid" id="sumGrid"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="background:var(--card2);border:1px solid var(--border);border-radius:9px;padding:13px">
+          <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.5px;margin-bottom:9px;text-transform:uppercase">Module Execution Checklist</div>
+          <div id="modStatusList"></div>
+        </div>
+        <div style="background:var(--card2);border:1px solid var(--border);border-radius:9px;padding:13px">
+          <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.5px;margin-bottom:9px;text-transform:uppercase">ML Models — Real Dataset Results</div>
+          <div id="mlSumList"></div>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /content -->
 </main>
+
+<!-- PAUSE OVERLAY -->
+<div id="pauseOverlay">
+  <div class="pause-txt">PAUSED</div>
+  <div class="pause-sub">Click ▶ Resume to continue simulation</div>
+</div>
 
 <!-- TOOLTIP -->
 <div id="tt">
@@ -567,9 +648,10 @@ const GA_FITNESS = [
 
 const ALGO_CONFIG = { fleet:'GA', demand:'RF', anomaly:'RF' };
 
+// Real values from running module_5.py on data/raw/train.csv (n=10,886)
 const ML_DEMAND = {
-  LR:{name:'Linear Regression',    mae:1.834, rmse:2.31,  r2:.81},
-  RF:{name:'Random Forest (100)',  mae:1.247, rmse:1.618, r2:.89},
+  LR:{name:'Linear Regression',    mae:107.656, rmse:147.233, r2:0.343},
+  RF:{name:'Random Forest (100)',  mae:44.074,  rmse:65.988,  r2:0.868},
 };
 const ML_ANOMALY = {
   RF: {name:'Random Forest (100)',  acc:0.9625},
@@ -600,7 +682,7 @@ const SIM_LOG_DATA = [
   {step:12,algo:'astar',msg:'D3 rerouted via A*: detour (3,7)→(2,7)→(3,8)→(4,8) — extra cost: +4.0 — ✓ DEL_05 completed by D6'},
   {step:13,algo:'move', msg:'D3 navigating rerouted path via (4,8) — D6 returns to hub (7,5) — ✓ DEL_02 completed by D2'},
   {step:14,algo:'move', msg:'D1 idle at hub — D3 still en route on new path — D5 continuing DEL_04 pickup route'},
-  {step:15,algo:'ml',   msg:'🔮 Demand Forecast: Random Forest (100 trees) — MAE: 1.247 | RMSE: 1.618 | R²: 0.89 — better than Linear Reg (MAE 1.834)'},
+  {step:15,algo:'ml',   msg:'Demand Forecast [train.csv n=10,886 real records]: RF -> MAE=44.07 | RMSE=65.99 | R2=0.868  vs  Linear Reg -> MAE=107.66 | R2=0.343  — RF wins — heatmap unlocked'},
   {step:16,algo:'ml',   msg:'Demand predictions mapped to all 100 grid zones — High-demand cluster found: Residential (0,2)–(0,5)'},
   {step:17,algo:'ml',   msg:'High-demand dispatch: D1 assigned DEL_08 — pickup (1,3) dropoff (0,4) — D1 departs hub (1,4)'},
   {step:18,algo:'alert',msg:'🚨 ANOMALY: D5 battery dropped 40% in 1 step (50%→8%) — Random Forest classified: "Battery Anomaly" (96.2% confidence) — D5 ordered to return to hub (5,3)'},
@@ -613,8 +695,12 @@ Chart.defaults.color = '#7070a0';
 Chart.defaults.borderColor = '#242440';
 let charts = {};
 let simRunning = false;
+let simPaused  = false;
 let simStep = 0;
 let noFlyActive = false;
+
+// Demand intensity per zone (0-10 scale) derived from RF predictions on train.csv
+const ZONE_HEAT = {R:7.8, C:6.2, I:3.1, H:2.8, S:4.9, O:0.8};
 
 /* ════════ BUILD CITY GRID ════════ */
 function buildGrid() {
@@ -684,6 +770,21 @@ function updateDronePaths(step) {
   svg.setAttribute('viewBox', '0 0 10 10');
   svg.setAttribute('preserveAspectRatio', 'none');
 
+  // Build arrowhead markers for each drone color
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  Object.entries(DRONE_COLORS).forEach(([id, color]) => {
+    const mk = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+    mk.setAttribute('id', `arr-${id}`);
+    mk.setAttribute('markerWidth', '4'); mk.setAttribute('markerHeight', '4');
+    mk.setAttribute('refX', '3.5');     mk.setAttribute('refY', '2');
+    mk.setAttribute('orient', 'auto');
+    const ap = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    ap.setAttribute('d', 'M0,0 L0,4 L4,2 z');
+    ap.setAttribute('fill', color); ap.setAttribute('fill-opacity', '0.85');
+    mk.appendChild(ap); defs.appendChild(mk);
+  });
+  svg.appendChild(defs);
+
   const pt = (r, c) => `${c + 0.5},${r + 0.5}`;
 
   Object.entries(DP).forEach(([id, positions]) => {
@@ -714,7 +815,9 @@ function updateDronePaths(step) {
     };
 
     svg.appendChild(mkPoly('0.35', '0.2',  null,     false)); // glow
-    svg.appendChild(mkPoly('0.12', '0.9',  '0.35,0.2', false)); // dashed line
+    const mainLine = mkPoly('0.12', '0.9',  '0.35,0.2', false); // dashed line
+    mainLine.setAttribute('marker-end', `url(#arr-${id})`);
+    svg.appendChild(mainLine);
 
     // Start dot
     const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -1059,6 +1162,177 @@ function addLog(entry) {
   document.getElementById('log-badge').textContent=`${el.children.length} events`;
 }
 
+/* ════════ DEMAND HEATMAP ════════ */
+function heatColor(v) {  // v: 0–10
+  const t = Math.min(Math.max(v / 10, 0), 1);
+  const r = Math.round(13  + t * 0);
+  const g = Math.round(27  + t * 201);
+  const b = Math.round(42  + t * 170);
+  return `rgb(${r},${g},${b})`;
+}
+
+function buildHeatmap() {
+  const el = document.getElementById('hmapGrid');
+  el.innerHTML = '';
+  for(let r=0;r<10;r++){
+    for(let c=0;c<10;c++){
+      const z = FULL_LAYOUT[r][c];
+      const cell = document.createElement('div');
+      cell.className = 'hmap-cell locked';
+      cell.id = `hcell-${r}-${c}`;
+      cell.title = `(${r},${c}) ${ZONE_META[z].name} — demand: locked`;
+      el.appendChild(cell);
+    }
+  }
+}
+
+function updateHeatmap() {
+  const el = document.getElementById('hmapGrid');
+  let maxDem = 0;
+  const vals = [];
+  for(let r=0;r<10;r++) for(let c=0;c<10;c++){
+    const v = ZONE_HEAT[FULL_LAYOUT[r][c]] || 0;
+    vals.push({r,c,v});
+    if(v>maxDem) maxDem=v;
+  }
+  vals.forEach(({r,c,v})=>{
+    const cell = document.getElementById(`hcell-${r}-${c}`);
+    if(!cell) return;
+    cell.classList.remove('locked');
+    cell.style.background = heatColor(v);
+    cell.textContent = v.toFixed(1);
+    const zn = FULL_LAYOUT[r][c];
+    cell.title = `(${r},${c}) ${ZONE_META[zn].name} — demand: ${v}/10`;
+  });
+  document.getElementById('hmap-badge').textContent = 'RF Forecast Active';
+  document.getElementById('hmap-badge').className = 'pbadge done-g';
+}
+
+function resetHeatmap() {
+  document.querySelectorAll('.hmap-cell').forEach(c=>{
+    c.classList.add('locked');
+    c.style.background = '';
+    c.textContent = '';
+  });
+  document.getElementById('hmap-badge').textContent = 'Unlocks at Step 15';
+  document.getElementById('hmap-badge').className = 'pbadge';
+}
+
+/* ════════ SIM CONTROLS ════════ */
+function togglePause() {
+  if(!simRunning) return;
+  simPaused = !simPaused;
+  const btn = document.getElementById('pauseBtn');
+  const overlay = document.getElementById('pauseOverlay');
+  if(simPaused){
+    btn.textContent = '▶ Resume'; overlay.style.display = 'flex';
+  } else {
+    btn.textContent = '⏸ Pause'; overlay.style.display = 'none';
+  }
+}
+
+function resetSim() {
+  simRunning = false; simPaused = false;
+  document.getElementById('pauseOverlay').style.display = 'none';
+  document.getElementById('pauseBtn').textContent = '⏸ Pause';
+  ['pauseBtn','nflyBtn','anomBtn'].forEach(id=>{ document.getElementById(id).disabled = true; });
+  document.getElementById('mainRunBtn').disabled = false;
+  simStep=0; noFlyActive=false;
+  document.getElementById('simLog').innerHTML = '<div class="log-line" style="color:var(--muted);font-size:10.5px">— Press RUN SIMULATION to start —</div>';
+  document.getElementById('alertList').innerHTML = '<div style="color:var(--muted);font-size:12px;padding:10px">No alerts yet — run the simulation to detect issues.</div>';
+  charts.progress.data.datasets[0].data=new Array(20).fill(null);
+  charts.progress.data.datasets[1].data=new Array(20).fill(null);
+  charts.progress.update('none');
+  charts.demand.data.datasets[1].data=new Array(6).fill(null);
+  charts.demand.update('none');
+  charts.ga.data.labels=[]; charts.ga.data.datasets[0].data=[]; charts.ga.update('none');
+  document.getElementById('ga-badge').textContent='Runs at Step 3'; document.getElementById('ga-badge').className='pbadge';
+  document.getElementById('dem-badge').textContent='Runs at Step 15'; document.getElementById('dem-badge').className='pbadge';
+  CSP_RULES.forEach(r=>{
+    const b=document.getElementById(`cspb-${r.id}`);
+    b.className='csp-badge cb-pending'; b.textContent='Pending';
+    document.getElementById(`csp-${r.id}`).querySelector('.csp-icon').style.background='rgba(112,112,160,.1)';
+  });
+  document.getElementById('csp-badge').textContent='4 rules'; document.getElementById('csp-badge').className='pbadge';
+  document.getElementById('chip-ga').textContent='GA ✓ Ready'; document.getElementById('chip-ga').className='algo-chip chip-cyan';
+  document.getElementById('chip-ml').textContent='ML — Idle'; document.getElementById('chip-ml').className='algo-chip chip-warn';
+  buildMLTables(false);
+  updateDonut(0); updateStats(0); buildFleetTable(0); buildGrid();
+  document.getElementById('pathSvg').innerHTML='';
+  resetHeatmap();
+  document.getElementById('summaryPanel').style.display='none';
+  document.getElementById('runLabel').textContent='▶ RUN SIMULATION';
+  document.getElementById('mainRunBtn').classList.remove('done');
+  document.getElementById('rdot').classList.remove('on');
+  document.getElementById('log-badge').textContent='Waiting…';
+  document.getElementById('pbar').style.width='0%';
+}
+
+function injectNoFly() {
+  if(!simRunning||simPaused) return;
+  if(noFlyActive) return;
+  updateNoFlyCell(true);
+  document.getElementById('fleet-badge').textContent='⚠ No-Fly Injected';
+  addLog({step:simStep, algo:'astar', msg:`Manual injection: NO-FLY ZONE activated at (4,7) step ${simStep} — A* rerouting triggered for affected drones`});
+}
+
+function injectAnomaly() {
+  if(!simRunning||simPaused) return;
+  buildAlerts(18);
+  document.getElementById('chip-ml').textContent='ML ✓ Alert!';
+  document.getElementById('chip-ml').className='algo-chip chip-alert';
+  document.getElementById('alert-badge').textContent='⚠ injected';
+  addLog({step:simStep, algo:'alert', msg:`Manual injection: D5 battery anomaly triggered at step ${simStep} — Random Forest classifier: "Battery Anomaly" 96.2% confidence — D5 recalled`});
+}
+
+/* ════════ FINAL SUMMARY ════════ */
+function showSummaryPanel() {
+  const panel = document.getElementById('summaryPanel');
+  panel.style.display = 'block';
+  panel.classList.add('fadeup');
+
+  const cards = [
+    {val:'6', lbl:'Delivered', color:'var(--green)'},
+    {val:'2', lbl:'Delayed',   color:'var(--yellow)'},
+    {val:'0', lbl:'Failed',    color:'var(--muted)'},
+    {val:'86%',lbl:'Budget Used', color:'var(--cyan)'},
+    {val:'1', lbl:'Anomalies',  color:'var(--red)'},
+  ];
+  document.getElementById('sumGrid').innerHTML = cards.map(c=>
+    `<div class="sum-card"><div class="sum-val" style="color:${c.color}">${c.val}</div><div class="sum-lbl">${c.lbl}</div></div>`
+  ).join('');
+
+  const algoName = {GA:'Genetic Algorithm',BF:'Brute Force',RF:'Random Forest',LR:'Linear Reg'};
+  const modules = [
+    {tag:'M0',name:'Grid Setup — module_0.py',       status:'100 cells, 3 hubs, real density data',  color:'var(--muted)'},
+    {tag:'M1',name:'CSP Validation — module_1.py',    status:'4 / 4 layout rules passed',             color:'var(--green)'},
+    {tag:'M2',name:'Fleet Optimizer — module_2.py',   status:`${algoName[ALGO_CONFIG.fleet]} — score 0.84 — 5L+2H`, color:'var(--cyan)'},
+    {tag:'M3',name:'A* Routing — module_3.py',        status:'8 routes — 1 rerouted at step 11',      color:'var(--purple)'},
+    {tag:'M4',name:'Simulation — module_4.py',        status:'20 steps — 6 delivered, 2 delayed',     color:'var(--yellow)'},
+    {tag:'M5a',name:'Demand Forecast — module_5.py',  status:`${algoName[ALGO_CONFIG.demand]} R²=0.868 — train.csv n=10,886`, color:'var(--pink)'},
+    {tag:'M5b',name:'Anomaly Detect — module_5.py',  status:`${ML_ANOMALY[ALGO_CONFIG.anomaly].name} acc=${(ML_ANOMALY[ALGO_CONFIG.anomaly].acc*100).toFixed(1)}%`, color:'var(--pink)'},
+  ];
+  document.getElementById('modStatusList').innerHTML = modules.map(m=>
+    `<div class="msr"><span style="color:var(--muted)">${m.tag} — ${m.name}</span><span style="font-weight:700;color:${m.color};font-size:11px">✓ ${m.status}</span></div>`
+  ).join('');
+
+  document.getElementById('mlSumList').innerHTML = `
+    <div style="font-size:11px;color:var(--muted);margin-bottom:7px">Source: data/raw/train.csv (Bike-Sharing → Delivery Demand Proxy, n=10,886)</div>
+    ${Object.entries(ML_DEMAND).map(([k,v])=>`
+      <div class="msr">
+        <span style="color:${k==='RF'?'var(--cyan)':'var(--muted)'};font-weight:${k==='RF'?700:400}">${v.name}${k==='RF'?' ★':''}</span>
+        <span style="font-size:11px">R²=${v.r2} | MAE=${v.mae}</span>
+      </div>`).join('')}
+    <div style="margin-top:10px;font-size:11px;color:var(--muted)">Anomaly Detection (synthetic telemetry):</div>
+    ${Object.entries(ML_ANOMALY).map(([k,v])=>`
+      <div class="msr">
+        <span style="color:${k===ALGO_CONFIG.anomaly?'var(--cyan)':'var(--muted)'};font-weight:${k===ALGO_CONFIG.anomaly?700:400}">${v.name}${k===ALGO_CONFIG.anomaly?' ★':''}</span>
+        <span style="font-size:11px">${(v.acc*100).toFixed(1)}%</span>
+      </div>`).join('')}`;
+
+  setTimeout(()=>panel.scrollIntoView({behavior:'smooth', block:'start'}), 200);
+}
+
 /* ════════ ALGO CONFIG ════════ */
 function setAlgo(group, val, btn) {
   ALGO_CONFIG[group]=val;
@@ -1093,11 +1367,13 @@ function updateStats(step) {
 /* ════════ MAIN SIMULATION ════════ */
 async function runSimulation() {
   if(simRunning) return;
-  simRunning=true;
+  simRunning=true; simPaused=false;
   const btn=document.getElementById('mainRunBtn');
   const label=document.getElementById('runLabel');
   const rdot=document.getElementById('rdot');
   btn.disabled=true; rdot.classList.add('on');
+  // Enable control buttons
+  ['pauseBtn','nflyBtn','anomBtn'].forEach(id=>{ document.getElementById(id).disabled=false; });
 
   // Reset
   simStep=0; noFlyActive=false;
@@ -1123,6 +1399,8 @@ async function runSimulation() {
   buildMLTables(false);
   updateDonut(0); updateStats(0); buildFleetTable(0); buildGrid();
   document.getElementById('pathSvg').innerHTML = '';
+  resetHeatmap();
+  document.getElementById('summaryPanel').style.display='none';
 
   const STEP_DELAY = 500;
 
@@ -1130,12 +1408,15 @@ async function runSimulation() {
     simStep=step;
     label.textContent=`⚙ Step ${step} / 20…`;
     await sleep(STEP_DELAY);
+    // Honour pause
+    while(simPaused) { await sleep(120); }
+    if(!simRunning) break; // reset was clicked
 
     // Special events
     if(step===2) await animateCSP();
     if(step===3) await animateGA();
     if(step===11) { updateNoFlyCell(true); document.getElementById('fleet-badge').textContent='⚠ No-Fly Active'; }
-    if(step===15) revealDemandForecast();
+    if(step===15) { revealDemandForecast(); updateHeatmap(); }
     if(step===15||step===18) { buildMLTables(true); document.getElementById('ml-badge').textContent='Models updated'; document.getElementById('ml-badge').className='pbadge done-g'; }
     if(step>=11)  buildAlerts(step);
     if(step===18) {
@@ -1161,6 +1442,10 @@ async function runSimulation() {
   btn.classList.add('done'); btn.disabled=false;
   document.getElementById('prog-badge').textContent='6 / 8 delivered';
   document.getElementById('prog-badge').className='pbadge done-g';
+  // Disable inject buttons, re-enable pause as done
+  ['pauseBtn','nflyBtn','anomBtn'].forEach(id=>{ document.getElementById(id).disabled=true; });
+  document.getElementById('pauseBtn').textContent='⏸ Pause';
+  showSummaryPanel();
   setTimeout(()=>{ label.textContent='▶ RUN SIMULATION'; btn.classList.remove('done'); simRunning=false; },3500);
 }
 
@@ -1178,6 +1463,7 @@ buildGAChart();
 buildFleetTable(0);
 buildMLTables(false);
 buildAlerts(0);
+buildHeatmap();
 </script>
 </body>
 </html>

@@ -11,85 +11,146 @@ from sklearn.metrics         import (mean_absolute_error, mean_squared_error,
                                      accuracy_score, confusion_matrix,
                                      classification_report)
 
-processed_dir = os.path.join(os.path.dirname(__file__), "..", "data", "processed")
+_base_dir     = os.path.dirname(__file__)
+processed_dir = os.path.join(_base_dir, "..", "data", "processed")
+raw_dir       = os.path.join(_base_dir, "..", "data", "raw")
 os.makedirs(processed_dir, exist_ok=True)
 
 anomaly_labels = {0: "Normal", 1: "Battery Anomaly", 2: "Route Anomaly", 3: "Sensor Spike"}
 
+# ── Real features from Bike-Sharing dataset (delivery demand proxy) ──────────
+DEMAND_FEATURES = ["season", "holiday", "workingday", "weather",
+                   "temp", "humidity", "windspeed", "hour", "month", "weekday"]
+
+# Per-zone typical conditions used to predict grid-cell demand at inference time
+_ZONE_FEATURE_ROWS = {
+    # [season, holiday, workingday, weather, temp, humidity, windspeed, hour, month, weekday]
+    "Residential": [2, 0, 1, 1, 20.0, 55.0, 12.0, 18, 6, 0],  # evening rush, summer
+    "Commercial":  [2, 0, 1, 1, 22.0, 50.0, 10.0, 14, 6, 1],  # midday peak, summer
+    "Industrial":  [2, 0, 1, 2, 18.0, 60.0, 18.0,  8, 6, 2],  # morning shift, overcast
+    "Hospital":    [2, 0, 1, 1, 20.0, 55.0, 12.0, 10, 6, 3],  # mid-morning, clear
+    "School":      [2, 0, 1, 1, 19.0, 57.0, 11.0,  9, 9, 4],  # school morning, fall
+    "Open Field":  [1, 0, 0, 1, 12.0, 70.0, 22.0, 10, 1, 5],  # winter, weekend, low
+}
+
+
+def _load_demand_data():
+    """
+    Primary  : data/raw/train.csv  — real Kaggle Bike-Sharing dataset
+               (used as delivery-demand proxy per assignment spec)
+    Fallback : _generate_demand_data()  — synthetic, if CSV missing
+    """
+    csv_path = os.path.join(raw_dir, "train.csv")
+    if os.path.exists(csv_path):
+        df = pd.read_csv(csv_path)
+        df["datetime"] = pd.to_datetime(df["datetime"])
+        df["hour"]     = df["datetime"].dt.hour
+        df["month"]    = df["datetime"].dt.month
+        df["weekday"]  = df["datetime"].dt.weekday
+        keep = DEMAND_FEATURES + ["count"]
+        df   = df[keep].dropna().reset_index(drop=True)
+        return df, True
+    # ── fallback ─────────────────────────────────────────────────────────────
+    return _generate_demand_data(), False
+
 
 def _generate_demand_data(n=1200, seed=0):
-    rng         = np.random.default_rng(seed)
-    hour        = rng.integers(0, 24, n)
-    day         = rng.integers(1, 8, n)
-    month       = rng.integers(1, 13, n)
-    season      = np.where(month <= 3, 1, np.where(month <= 6, 2, np.where(month <= 9, 3, 4)))
-    temp        = rng.uniform(5, 38, n)
-    humidity    = rng.uniform(20, 95, n)
-    weather     = rng.integers(1, 5, n)
-    zone_density= rng.uniform(0.5, 5.0, n)
-    base         = 3 * zone_density
-    hour_effect  = np.where((hour >= 8) & (hour <= 20), 2.5, 0.5)
-    day_effect   = np.where(day <= 5, 1.2, 0.8)
-    season_effect= np.where(season == 3, 1.3, np.where(season == 1, 0.7, 1.0))
-    temp_effect  = np.clip((temp - 15) / 10, -1, 1) * 0.8
-    weather_eff  = np.where(weather == 1, 1.0, np.where(weather == 2, 0.8,
-                   np.where(weather == 3, 0.5, 0.3)))
-    noise        = rng.normal(0, 0.5, n)
-    count = np.round(np.clip(
-        base * hour_effect * day_effect * season_effect * weather_eff + temp_effect + noise, 0, None), 1)
+    """Synthetic fallback — only used if train.csv is absent."""
+    rng      = np.random.default_rng(seed)
+    season   = rng.integers(1, 5, n)
+    holiday  = rng.integers(0, 2, n)
+    working  = 1 - holiday
+    weather  = rng.integers(1, 5, n)
+    temp     = rng.uniform(5, 38, n)
+    humidity = rng.uniform(20, 95, n)
+    wind     = rng.uniform(0, 50, n)
+    hour     = rng.integers(0, 24, n)
+    month    = rng.integers(1, 13, n)
+    weekday  = rng.integers(0, 7, n)
+    base     = (np.where((hour >= 7) & (hour <= 20), 2.5, 0.5) *
+                np.where(working == 1, 1.2, 0.8) *
+                np.where(season == 3, 1.3, np.where(season == 1, 0.7, 1.0)) *
+                np.where(weather == 1, 1.0, np.where(weather == 2, 0.8, 0.4)))
+    count = np.round(np.clip(base * 20 + rng.normal(0, 3, n), 0, None), 1)
     return pd.DataFrame({
-        "hour": hour, "day": day, "month": month, "season": season,
-        "temp": temp.round(1), "humidity": humidity.round(1),
-        "weather": weather, "zone_density": zone_density.round(2), "count": count,
-    })
+        "season": season, "holiday": holiday, "workingday": working,
+        "weather": weather, "temp": temp.round(1), "humidity": humidity.round(1),
+        "windspeed": wind.round(1), "hour": hour, "month": month,
+        "weekday": weekday, "count": count,
+    }), False
 
 
 def run_demand_forecast(grid=None, verbose=True):
-    df       = _generate_demand_data()
+    df, is_real = _load_demand_data()
     df.to_csv(os.path.join(processed_dir, "demand_data.csv"), index=False)
-    features = ["hour", "day", "month", "season", "temp", "humidity", "weather", "zone_density"]
-    x        = df[features].values
-    y        = df["count"].values
+
+    x = df[DEMAND_FEATURES].values
+    y = df["count"].values
     x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
-    lr = LinearRegression()
+
+    # ── Linear Regression ────────────────────────────────────────────────────
+    lr      = LinearRegression()
     lr.fit(x_train, y_train)
-    lr_mae  = round(mean_absolute_error(y_test, lr.predict(x_test)), 3)
-    lr_rmse = round(np.sqrt(mean_squared_error(y_test, lr.predict(x_test))), 3)
-    rf = RandomForestRegressor(n_estimators=100, random_state=42)
+    lr_pred = lr.predict(x_test)
+    lr_mae  = round(mean_absolute_error(y_test, lr_pred), 3)
+    lr_rmse = round(float(np.sqrt(mean_squared_error(y_test, lr_pred))), 3)
+    lr_r2   = round(float(1 - np.sum((y_test - lr_pred)**2) /
+                          np.sum((y_test - y_test.mean())**2)), 3)
+
+    # ── Random Forest Regressor ───────────────────────────────────────────────
+    rf      = RandomForestRegressor(n_estimators=100, random_state=42)
     rf.fit(x_train, y_train)
     rf_pred = rf.predict(x_test)
     rf_mae  = round(mean_absolute_error(y_test, rf_pred), 3)
-    rf_rmse = round(np.sqrt(mean_squared_error(y_test, rf_pred)), 3)
-    sample_pred   = round(float(rf.predict(np.array([[14, 3, 6, 2, 25.0, 60.0, 1, 3.5]]))[0]), 2)
-    sample_scaled = round(sample_pred / max(rf_pred.max(), 1) * 10, 2)
+    rf_rmse = round(float(np.sqrt(mean_squared_error(y_test, rf_pred))), 3)
+    rf_r2   = round(float(1 - np.sum((y_test - rf_pred)**2) /
+                          np.sum((y_test - y_test.mean())**2)), 3)
+
+    # Sample: working day, spring, clear weather, noon, mild conditions
+    sample_row   = np.array([[2, 0, 1, 1, 20.0, 55.0, 15.0, 12, 4, 2]])
+    sample_pred  = round(float(rf.predict(sample_row)[0]), 2)
+    sample_scaled= round(sample_pred / max(rf_pred.max(), 1) * 10, 2)
+
+    # ── Grid demand mapping ───────────────────────────────────────────────────
     grid_forecast = {}
     if grid is not None:
-        feat_arr = np.array([[12, 3, 6, 2, 25.0, 55.0, 1, cell.density / 1000.0]
-                             for row in grid for cell in row])
-        raw      = rf.predict(feat_arr)
-        scaled   = (raw / max(raw.max(), 1) * 10).reshape(10, 10)
+        feat_arr = np.array([
+            _ZONE_FEATURE_ROWS.get(cell.zone, _ZONE_FEATURE_ROWS["Open Field"])
+            for row in grid for cell in row
+        ])
+        raw    = rf.predict(feat_arr)
+        scaled = (raw / max(raw.max(), 1) * 10).reshape(10, 10)
         for r in range(10):
             for c in range(10):
                 grid[r][c].demand = round(float(scaled[r, c]), 2)
         grid_forecast = {"updated": True, "zones_updated": 100}
+
     if verbose:
+        src = (f"real  - Bike-Sharing Dataset  (n={len(df)}, data/raw/train.csv)"
+               if is_real else f"synthetic fallback (n={len(df)})")
         print(f"\n{'='*60}")
-        print("  DEMAND FORECASTING RESULTS")
+        print("  MODULE 5a - DEMAND FORECASTING")
         print(f"{'='*60}")
-        print(f"  Dataset    : synthetic (n={len(df)}, Bike-Sharing style)")
-        print(f"  Features   : {features}")
-        print(f"  Model      : Random Forest Regressor (n_estimators=100)")
-        print(f"  Linear Regression  ->  MAE={lr_mae}  |  RMSE={lr_rmse}")
-        print(f"  Random Forest      ->  MAE={rf_mae}  |  RMSE={rf_rmse}")
-        print(f"  Sample forecast    : Hour 14 demand = {sample_pred} (scaled: {sample_scaled})")
+        print(f"  Data source : {src}")
+        print(f"  Proxy note  : Bike-rental demand -> delivery demand (per spec)")
+        print(f"  Features    : {DEMAND_FEATURES}")
+        print(f"\n  Linear Regression   MAE={lr_mae}  RMSE={lr_rmse}  R2={lr_r2}")
+        print(f"  Random Forest       MAE={rf_mae}  RMSE={rf_rmse}  R2={rf_r2}  <- best")
+        print(f"  Sample forecast     noon/spring/clear -> {sample_pred} units (scaled: {sample_scaled}/10)")
         if grid_forecast:
-            print(f"  Demand mapped to grid: {grid_forecast['zones_updated']} zones updated.")
+            print(f"  Grid updated        {grid_forecast['zones_updated']} zones re-scored")
         print(f"{'='*60}\n")
-    return {"lr_mae": lr_mae, "lr_rmse": lr_rmse, "rf_mae": rf_mae,
-            "rf_rmse": rf_rmse, "model": rf, "grid_forecast": grid_forecast}
+
+    return {
+        "lr_mae": lr_mae, "lr_rmse": lr_rmse, "lr_r2": lr_r2,
+        "rf_mae": rf_mae, "rf_rmse": rf_rmse, "rf_r2": rf_r2,
+        "model": rf, "grid_forecast": grid_forecast,
+        "data_source": "real" if is_real else "synthetic",
+        "n_samples": len(df),
+    }
 
 
-train_demand_model = run_demand_forecast
+train_demand_model = run_demand_forecast   # backward-compat alias
 
 
 def _generate_anomaly_data(n=800, seed=1):
